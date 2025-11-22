@@ -1,0 +1,22 @@
+{
+  "watch": [
+    "bot-modular.js",
+    "enhanced-bot.js",
+    "api-server.js",
+    "src/",
+    ".env"
+  ],
+  "ignore": [
+    "auth_info_baileys/**",
+    "logs/**",
+    "cache/**",
+    "node_modules/**",
+    ".git/**",
+    "*.log"
+  ],
+  "delay": 1000,
+  "ext": "js,json",
+  "env": {
+    "NODE_ENV": "development"
+  }
+}
