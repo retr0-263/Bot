@@ -308,17 +308,9 @@ class SmartWhatsAppBot {
    */
   async handleCommand(text, from, phoneNumber, cleanPhone, isGroup, message) {
     try {
-      // Parse command using CommandParser utility
-      const parsed = CommandParser.parseCommand(text);
-      if (!parsed) {
-        return await this.messageService.sendTextMessage(
-          from,
-          `❌ Invalid command format\nType ${this.prefix}menu for help`
-        );
-      }
-
-      const command = parsed.command;
-      const params = parsed.args;
+      const args = text.slice(this.prefix.length).trim().split(/\s+/);
+      const command = args[0]?.toLowerCase();
+      const params = args.slice(1);
 
       console.log(chalk.blue(`📝 Command: ${command}`), chalk.gray(`from ${cleanPhone}`));
 
