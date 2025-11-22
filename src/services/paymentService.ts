@@ -42,7 +42,7 @@ class PaymentService {
     return `${baseUrl}?order=${orderId}&amount=${amount}&currency=${currency}`;
   }
 
-  async verifyPayment(orderId: string, paymentMethod: string): Promise<boolean> {
+  async verifyPayment(): Promise<boolean> {
     // Simulate webhook verification
     await new Promise(resolve => setTimeout(resolve, 2000));
     

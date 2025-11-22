@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrendingUp, DollarSign, ShoppingCart, Building2, Users, Globe } from 'lucide-react';
+import { DollarSign, ShoppingCart, Building2, Users, Globe } from 'lucide-react';
 import { useData } from '../../contexts/DataContext';
 
 export default function PlatformAnalytics() {

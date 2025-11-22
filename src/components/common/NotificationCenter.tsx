@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, X, Check, Trash2, Settings } from 'lucide-react';
+import { Bell, X, Check, Trash2 } from 'lucide-react';
 import { notificationService, Notification } from '../../services/notificationService';
 import { useAuth } from '../../contexts/AuthContext';
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, Server, Database, Wifi, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import { Activity, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
 import { webhookService } from '../../services/webhookService';
 
 interface HealthMetric {
@@ -11,7 +11,7 @@ interface HealthMetric {
 }
 
 export default function SystemHealth() {
-  const [metrics, setMetrics] = useState<HealthMetric[]>([
+  const [metrics] = useState<HealthMetric[]>([
     {
       name: 'API Response Time',
       status: 'healthy',

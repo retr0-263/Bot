@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Copy, Trash2, Eye, Send } from 'lucide-react';
+import { Plus, Search, Copy, Trash2, Eye } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTemplate } from '../../hooks/useTemplate';
 import { MessageTemplate } from '../../types/template';

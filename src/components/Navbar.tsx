@@ -1,5 +1,5 @@
 import React from 'react';
-import { MessageSquare, LogOut, Settings, BarChart3 } from 'lucide-react';
+import { MessageSquare, LogOut } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface NavbarProps {

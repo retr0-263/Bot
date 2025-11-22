@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { imageUploadService, ImageUploadOptions, CompressedImage } from '../services/imageUploadService';
+import { imageUploadService, ImageUploadOptions } from '../services/imageUploadService';
 
 export interface ImageUploadState {
   files: File[];
@@ -121,7 +121,7 @@ export function useImageUpload() {
 /**
  * Hook for image metadata retrieval
  */
-export function useImageMetadata(file: File | null) {
+export function useImageMetadata() {
   const [metadata, setMetadata] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

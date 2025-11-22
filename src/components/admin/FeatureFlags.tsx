@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ToggleLeft as Toggle, Save, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Save, RefreshCw, AlertTriangle } from 'lucide-react';
 
 interface FeatureFlag {
   id: string;

@@ -2,7 +2,6 @@ import React from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
-  Users, 
   BarChart3, 
   Settings, 
   Building2,

@@ -1,6 +1,6 @@
 import React from 'react';
 import { AlertTriangle, CheckCircle, Clock } from 'lucide-react';
-import { subscriptionService, UsageStats } from '../../services/subscriptionService';
+import { subscriptionService } from '../../services/subscriptionService';
 import { Merchant } from '../../types';
 
 interface UsageIndicatorProps {

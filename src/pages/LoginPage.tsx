@@ -13,7 +13,7 @@ export default function LoginPage() {
     e.preventDefault();
     try {
       await login(credentials);
-    } catch (err) {
+    } catch {
       // Error handled in context
     }
   };

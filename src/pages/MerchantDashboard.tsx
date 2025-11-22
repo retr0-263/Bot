@@ -6,10 +6,8 @@ import {
   ShoppingCart, 
   BarChart3, 
   Settings, 
-  Plus,
-  TrendingUp,
   DollarSign,
-  Users,
+  TrendingUp,
   AlertCircle
 } from 'lucide-react';
 import { useData } from '../contexts/DataContext';
@@ -24,12 +22,7 @@ import MerchantSettings from '../components/merchant/MerchantSettings';
 
 export default function MerchantDashboard() {
   const location = useLocation();
-  const { user } = useAuth();
-  const { products, orders, analytics, merchants } = useData();
-  const [showProductForm, setShowProductForm] = useState(false);
-  const [showUpgradePrompt, setShowUpgradePrompt] = useState(true);
-  
-  const merchant = merchants.find(m => m.id === user?.merchantId);
+  const { products, analytics } = useData();
 
   const navigation = [
     { name: 'Overview', href: '/dashboard', icon: LayoutDashboard },
@@ -126,7 +119,7 @@ export default function MerchantDashboard() {
 function DashboardOverview({ stats }: { stats: any[] }) {
   const { orders, products, merchants } = useData();
   const { user } = useAuth();
-  const [showProductForm, setShowProductForm] = useState(false);
+  const [, setShowProductForm] = useState(false);
   const [showUpgradePrompt, setShowUpgradePrompt] = useState(true);
   
   const merchant = merchants.find(m => m.id === user?.merchantId);

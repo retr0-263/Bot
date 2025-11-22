@@ -23,7 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const userData = authService.getCurrentUser();
         setUser(userData);
-      } catch (err) {
+      } catch {
         localStorage.removeItem('token');
       }
     }

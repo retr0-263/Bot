@@ -7,9 +7,7 @@ import {
   ExtendedUser, 
   UserRole, 
   UserSession, 
-  OTPVerification,
   RegisterRequest,
-  LoginRequest,
   ROLE_PERMISSIONS
 } from '../types/auth';
 
@@ -64,10 +62,10 @@ class ExtendedAuthService {
 
       const data = await response.json();
       return data;
-    } catch (error) {
+    } catch {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to send OTP',
+        error: 'Failed to send OTP',
       };
     }
   }
@@ -377,7 +375,7 @@ class ExtendedAuthService {
       localStorage.removeItem('userProfile');
       
       return await response.json();
-    } catch (error) {
+    } catch {
       localStorage.removeItem('authToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('userProfile');

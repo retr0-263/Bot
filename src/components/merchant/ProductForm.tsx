@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import { useData } from '../../contexts/DataContext';
 import { Product } from '../../types';
-import { useAuth } from '../../contexts/AuthContext';
 
 interface ProductFormProps {
   product?: Product | null;
@@ -10,7 +9,6 @@ interface ProductFormProps {
 }
 
 export default function ProductForm({ product, onClose }: ProductFormProps) {
-  const { user } = useAuth();
   const { addProduct, updateProduct } = useData();
   const [formData, setFormData] = useState({
     name: product?.name || '',

@@ -46,7 +46,7 @@ export default function MediaCarouselBuilder({ onClose, onSave }: MediaCarouselB
         if (preview?.dataUrl) {
           setCurrentItem({ ...currentItem, imageUrl: preview.dataUrl });
         }
-      } catch (err) {
+      } catch {
         setError('Failed to process image');
       }
     }

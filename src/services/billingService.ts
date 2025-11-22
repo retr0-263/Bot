@@ -280,10 +280,10 @@ class BillingService {
       });
 
       return await response.json();
-    } catch (error) {
+    } catch {
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to validate promo code',
+        error: 'Failed to validate promo code',
       };
     }
   }
@@ -372,7 +372,7 @@ class BillingService {
   /**
    * Check subscription feature access
    */
-  async hasFeatureAccess(merchantId: string, feature: string): Promise<boolean> {
+  async hasFeatureAccess(merchantId: string): Promise<boolean> {
     try {
       const result = await this.getMerchantSubscription(merchantId);
       
@@ -380,7 +380,6 @@ class BillingService {
         return false;
       }
 
-      const tier = result.subscription.tier;
       // This would need to map tier to features
       return true;
     } catch (error) {

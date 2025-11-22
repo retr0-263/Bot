@@ -11,7 +11,6 @@ import {
   StockTransfer,
   BackorderItem,
   PartialShipment,
-  Bundle,
   BundleInventory,
   InventoryAdjustment
 } from '../types/inventory';
@@ -408,7 +407,7 @@ class InventoryService {
   /**
    * Check if product is available for order
    */
-  async isProductAvailable(productId: string, quantity: number, variantId?: string): Promise<boolean> {
+  async isProductAvailable(productId: string, quantity: number): Promise<boolean> {
     try {
       const result = await this.getInventoryLevel(productId);
       

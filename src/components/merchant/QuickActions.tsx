@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, MessageSquare, BarChart3, Settings, Download, Eye } from 'lucide-react';
+import { Plus, MessageSquare, BarChart3, Download, Eye } from 'lucide-react';
 import { useData } from '../../contexts/DataContext';
 
 interface QuickActionsProps {

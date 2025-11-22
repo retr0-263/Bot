@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Save, Globe, DollarSign, Settings, Bell, Shield } from 'lucide-react';
+import { Save, Globe, Settings, Bell, Shield } from 'lucide-react';
 
 export default function PlatformSettings() {
   const [settings, setSettings] = useState({

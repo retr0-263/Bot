@@ -129,9 +129,9 @@ class BotManager {
         return await this.cmdShowOrders(phoneNumber, userRole, merchantId, args[0]);
       case 'status':
       case 'track':
-        return await this.cmdOrderStatus(phoneNumber, args[0], merchantId);
+        return await this.cmdOrderStatus(phoneNumber, args[0]);
       case 'dashboard':
-        return await this.cmdMerchantDashboard(phoneNumber, userRole, merchantId);
+        return await this.cmdMerchantDashboard(phoneNumber, userRole);
       case 'help':
         return [{ type: 'text', content: this.getHelpText() }];
       default:
@@ -145,15 +145,9 @@ class BotManager {
     merchantId: string,
     intent: string
   ): Promise<BotMessage[]> {
-    let session = this.sessionCache.get(phoneNumber) || {
-      step: 'welcome',
-      context: {},
-      merchantId,
-    };
-
     switch (intent) {
       case 'intent_order':
-        return await this.processOrderIntent(phoneNumber, message, merchantId, session);
+        return await this.processOrderIntent(phoneNumber, message, merchantId);
       case 'intent_browse':
         return await this.cmdShowMenu(merchantId);
       case 'intent_checkout':
@@ -172,8 +166,7 @@ class BotManager {
   private async processOrderIntent(
     phoneNumber: string,
     message: string,
-    merchantId: string,
-    session: ConversationState
+    merchantId: string
   ): Promise<BotMessage[]> {
     const products = await botApiClient.listProducts(merchantId);
     if (!products.success) {
@@ -205,8 +198,7 @@ class BotManager {
 
   private findProductMatches(
     message: string,
-    products: Record<string, Array<{ id: string; name: string }>>,
-    _maxMatches = 3
+    products: Record<string, Array<{ id: string; name: string }>>
   ): Array<{ id: string; quantity: number }> {
     const matches: Array<{ id: string; quantity: number }> = [];
     const messageLower = message.toLowerCase();
@@ -405,7 +397,7 @@ class BotManager {
     return [{ type: 'text', content: text }];
   }
 
-  private async cmdOrderStatus(phoneNumber: string, orderId: string, _merchantId: string): Promise<BotMessage[]> {
+  private async cmdOrderStatus(phoneNumber: string, orderId: string): Promise<BotMessage[]> {
     if (!orderId) {
       return [{ type: 'text', content: 'Please provide an order ID. Usage: !status <order-id>' }];
     }
@@ -426,7 +418,7 @@ class BotManager {
     ];
   }
 
-  private async cmdMerchantDashboard(phoneNumber: string, userRole: string, merchantId: string): Promise<BotMessage[]> {
+  private async cmdMerchantDashboard(phoneNumber: string, userRole: string): Promise<BotMessage[]> {
     if (userRole !== 'merchant' && userRole !== 'super_admin') {
       return [{ type: 'text', content: 'Access denied. Merchant access required.' }];
     }

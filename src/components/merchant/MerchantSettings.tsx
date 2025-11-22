@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Save, MessageSquare, DollarSign, Globe, Bell } from 'lucide-react';
+import { Save } from 'lucide-react';
 import { useData } from '../../contexts/DataContext';
 import { useAuth } from '../../contexts/AuthContext';
 

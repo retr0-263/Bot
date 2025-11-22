@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Search, Filter, Edit2, Trash2, Building2, MoreVertical } from 'lucide-react';
+import { Plus, Search, Filter, Edit2, Trash2, Building2 } from 'lucide-react';
 import { useData } from '../../contexts/DataContext';
 import { Merchant } from '../../types';
 import MerchantForm from './MerchantForm';

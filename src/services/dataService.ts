@@ -1,4 +1,4 @@
-import { Product, Order, Merchant, Analytics, SubscriptionPlan, OrderItem } from '../types';
+import { Product, Order, Merchant, Analytics, SubscriptionPlan } from '../types';
 import { webhookService } from './webhookService';
 
 // Mock data for demo purposes
@@ -316,7 +316,6 @@ class DataService {
   // Analytics methods
   getAnalytics(merchantId: string): Analytics {
     const merchantOrders = this.orders.filter(o => o.merchantId === merchantId);
-    const products = this.products.filter(p => p.merchantId === merchantId);
     
     const totalRevenue = merchantOrders
       .filter(o => o.paymentStatus === 'paid')
