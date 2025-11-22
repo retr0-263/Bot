@@ -34,6 +34,8 @@ class SmartWhatsAppBotModular {
   constructor() {
     this.sock = null;
     this.qrShown = false;
+    this.bannerShown = false;
+    this.connectedOnce = false;
     this.store = makeInMemoryStore({
       logger: P().child({ level: 'silent', stream: 'store' }),
     });
@@ -47,6 +49,9 @@ class SmartWhatsAppBotModular {
   }
 
   setupBanner() {
+    if (this.bannerShown) return;
+    this.bannerShown = true;
+    
     console.clear();
     console.log(chalk.cyan(figlet.textSync('Smart WhatsApp', { horizontalLayout: 'full' })));
     console.log(chalk.green('🤖 Smart WhatsApp Bot - Modularized Architecture'));
@@ -185,9 +190,16 @@ class SmartWhatsAppBotModular {
         console.log(chalk.green('✨ Waiting for connection...\n'));
       }
 
+      // Only show startup info on successful connection
+      if (connection === 'open' && !this.connectedOnce) {
+        this.connectedOnce = true;
+        this.displayStartupInfo();
+      }
+
       // Only restart on actual disconnection, not on initial connection
       if (connection === 'close') {
         this.qrShown = false;
+        this.connectedOnce = false;
       }
 
       connectionHandler.handleConnectionUpdate(update, () => this.startBot());
