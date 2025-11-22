@@ -135,9 +135,11 @@ class SmartWhatsAppBot {
       this.utilityCommandHandler = new UtilityCommandHandler(this, this.messageService);
       this.advancedAdminHandler = new AdvancedAdminHandler(this, this.messageService, null);
       this.interactiveMessageHandler = new InteractiveMessageHandler(this, this.messageService);
-      this.customerHandler = new CustomerHandler(this.sock, this.messageService);
-      this.merchantHandler = new MerchantHandler(this.sock, this.messageService);
-      this.adminHandler = new AdminHandler(this.sock, this.messageService);
+      
+      // Handlers are already instantiated objects (not classes)
+      this.customerHandler = CustomerHandler;
+      this.merchantHandler = MerchantHandler;
+      this.adminHandler = AdminHandler;
 
       // Setup event handlers
       this.setupEventHandlers(saveCreds);
