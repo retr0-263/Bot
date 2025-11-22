@@ -1,0 +1,420 @@
+{
+  "auditDate": "2025-11-22",
+  "status": "READY FOR ENHANCEMENT",
+  "summary": {
+    "totalPages": 4,
+    "totalComponents": 12,
+    "apiClientsFound": 1,
+    "existingFeatures": [
+      "Basic product management (CRUD)",
+      "Order management (view, export, status updates)",
+      "Merchant dashboard with analytics",
+      "Admin dashboard (merchants, system health)",
+      "Authentication context",
+      "Data context with mock data"
+    ],
+    "missingFeatures": [
+      "Template management UI",
+      "Message preview/builder",
+      "Quick reply/button builder",
+      "Media carousel builder",
+      "Product bulk upload with CSV",
+      "4-image minimum enforcement",
+      "WebSocket real-time orders",
+      "Merchant approval queue",
+      "Template broadcast UI",
+      "Delivery map widget",
+      "Store opening hours editor",
+      "Dark mode",
+      "Progressive Web App (PWA)"
+    ]
+  },
+  "pages": {
+    "LoginPage.tsx": {
+      "path": "src/pages/LoginPage.tsx",
+      "purpose": "User authentication",
+      "status": "✅ Complete",
+      "apis": [],
+      "components": ["AuthContext"]
+    },
+    "MerchantDashboard.tsx": {
+      "path": "src/pages/MerchantDashboard.tsx",
+      "purpose": "Merchant overview and navigation",
+      "status": "✅ Complete - Needs real-time updates",
+      "apis": ["DataContext", "AuthContext"],
+      "components": [
+        "ProductManagement",
+        "OrderManagement",
+        "Analytics",
+        "MerchantSettings",
+        "QuickActions",
+        "UpgradePrompt",
+        "UsageIndicator"
+      ],
+      "requirements": [
+        "Add WebSocket for real-time orders",
+        "Add template management link",
+        "Add analytics widgets (sales, top product, low stock)"
+      ]
+    },
+    "SuperAdminDashboard.tsx": {
+      "path": "src/pages/SuperAdminDashboard.tsx",
+      "purpose": "Admin overview and management",
+      "status": "✅ Complete - Needs approval queue",
+      "apis": ["DataContext", "AuthContext"],
+      "components": [
+        "MerchantManagement",
+        "PlatformAnalytics",
+        "SystemHealth",
+        "FeatureFlags",
+        "MerchantForm",
+        "PlatformSettings"
+      ],
+      "requirements": [
+        "Add merchant approval queue component",
+        "Add template broadcast management",
+        "Add compliance/KYC docs viewer"
+      ]
+    },
+    "WhatsAppBot.tsx": {
+      "path": "src/pages/WhatsAppBot.tsx",
+      "purpose": "Bot configuration and testing",
+      "status": "✅ Complete",
+      "apis": ["BotManager", "WebhookService"],
+      "components": [],
+      "requirements": []
+    }
+  },
+  "components": {
+    "merchant": {
+      "ProductManagement.tsx": {
+        "path": "src/components/merchant/ProductManagement.tsx",
+        "lines": 199,
+        "status": "⚠️ Needs enhancement",
+        "currentFeatures": [
+          "Search/filter products",
+          "Add/Edit/Delete products",
+          "Toggle active/inactive",
+          "Display single image"
+        ],
+        "missingFeatures": [
+          "4-image minimum enforcement",
+          "Gallery preview (first 4 images)",
+          "Bulk upload with CSV",
+          "Image reordering",
+          "Quick publish/unpublish buttons",
+          "Duplicate product",
+          "Image compression preview",
+          "Drag-drop file upload"
+        ],
+        "relatedComponent": "ProductForm.tsx"
+      },
+      "ProductForm.tsx": {
+        "path": "src/components/merchant/ProductForm.tsx",
+        "status": "⚠️ Needs major update",
+        "currentFeatures": [
+          "Basic form fields (name, description, price, category, stock)"
+        ],
+        "missingFeatures": [
+          "Multiple image upload (minimum 4)",
+          "Drag-drop image upload",
+          "Image reordering UI",
+          "Image preview thumbnails",
+          "Image optimization/compression",
+          "Video thumbnail preview",
+          "Image size validation",
+          "Bulk edit mode"
+        ]
+      },
+      "OrderManagement.tsx": {
+        "path": "src/components/merchant/OrderManagement.tsx",
+        "lines": 316,
+        "status": "⚠️ Needs real-time updates",
+        "currentFeatures": [
+          "Search/filter orders",
+          "Status updates (pending, confirmed, fulfilled, cancelled)",
+          "Export to CSV",
+          "Display order details"
+        ],
+        "missingFeatures": [
+          "WebSocket real-time updates",
+          "Quick action buttons (Accept, Reject, Mark Preparing, etc.)",
+          "Order detail modal with live updates",
+          "Driver assignment UI",
+          "Delivery map widget",
+          "Customer communication UI",
+          "Refund UI",
+          "Order timeline view"
+        ]
+      },
+      "Analytics.tsx": {
+        "path": "src/components/merchant/Analytics.tsx",
+        "status": "⚠️ Needs mini-widgets",
+        "currentFeatures": [
+          "Chart display (sales trends, top products)"
+        ],
+        "missingFeatures": [
+          "Daily sales mini-widget (text for WhatsApp)",
+          "Top product mini-widget",
+          "Low stock count mini-widget",
+          "Customer engagement metrics",
+          "Revenue forecasting"
+        ]
+      },
+      "MerchantSettings.tsx": {
+        "path": "src/components/merchant/MerchantSettings.tsx",
+        "status": "⚠️ Needs major additions",
+        "currentFeatures": [
+          "Basic merchant info display"
+        ],
+        "missingFeatures": [
+          "Delivery radius map selector",
+          "Opening hours editor (repeat schedule)",
+          "Delivery fee editor",
+          "Template broadcast settings",
+          "Broadcast limit configuration",
+          "Webhook configuration",
+          "API key management"
+        ]
+      },
+      "QuickActions.tsx": {
+        "path": "src/components/merchant/QuickActions.tsx",
+        "status": "✅ Good foundation"
+      },
+      "UpgradePrompt.tsx": {
+        "path": "src/components/merchant/UpgradePrompt.tsx",
+        "status": "✅ Complete"
+      }
+    },
+    "admin": {
+      "MerchantManagement.tsx": {
+        "path": "src/components/admin/MerchantManagement.tsx",
+        "status": "⚠️ Needs approval queue"
+      },
+      "PlatformAnalytics.tsx": {
+        "path": "src/components/admin/PlatformAnalytics.tsx",
+        "status": "✅ Good foundation"
+      },
+      "SystemHealth.tsx": {
+        "path": "src/components/admin/SystemHealth.tsx",
+        "status": "✅ Complete"
+      },
+      "FeatureFlags.tsx": {
+        "path": "src/components/admin/FeatureFlags.tsx",
+        "status": "✅ Complete"
+      },
+      "MerchantForm.tsx": {
+        "path": "src/components/admin/MerchantForm.tsx",
+        "status": "✅ Complete"
+      },
+      "PlatformSettings.tsx": {
+        "path": "src/components/admin/PlatformSettings.tsx",
+        "status": "✅ Complete"
+      }
+    },
+    "common": {
+      "status": "Check folder for shared components"
+    }
+  },
+  "apiEndpoints": {
+    "currentlyUsed": {
+      "baseUrl": "Supabase functions: {SUPABASE_URL}/functions/v1",
+      "endpoints": [
+        "POST bot-auth (register, verify user)",
+        "POST bot-messages (save, get_session, clear_session)",
+        "POST bot-orders (create, get, update_status, list)",
+        "POST bot-products (list, search, get_details)",
+        "POST bot-carts (add, remove, get, clear)"
+      ]
+    },
+    "neededForEnhancements": {
+      "templates": {
+        "POST /templates/create": "Create message template",
+        "GET /templates/list": "List templates by merchant",
+        "PUT /templates/{id}": "Update template",
+        "DELETE /templates/{id}": "Delete template",
+        "POST /templates/preview": "Send test preview",
+        "POST /templates/validate": "Validate template variables"
+      },
+      "products": {
+        "POST /products/bulk-upload": "CSV bulk upload",
+        "POST /products/{id}/images": "Multiple image upload",
+        "GET /products/{id}/images": "Get all product images",
+        "DELETE /products/{id}/images/{imageId}": "Remove image",
+        "POST /products/{id}/images/reorder": "Reorder images"
+      },
+      "orders": {
+        "WS /orders/live": "WebSocket for real-time orders",
+        "PUT /orders/{id}/status": "Update order status",
+        "POST /orders/{id}/assign-driver": "Assign delivery driver",
+        "GET /orders/{id}/tracking": "Get delivery tracking info"
+      },
+      "merchants": {
+        "POST /merchants/approve": "Approve merchant application",
+        "POST /merchants/reject": "Reject merchant application",
+        "PUT /merchants/{id}/settings": "Update store settings",
+        "POST /merchants/{id}/broadcast": "Send template broadcast"
+      },
+      "media": {
+        "POST /media/upload": "Upload image/video",
+        "GET /media/{id}": "Get media info",
+        "POST /media/{id}/compress": "Get compression preview",
+        "DELETE /media/{id}": "Delete media"
+      }
+    }
+  },
+  "dataContext": {
+    "path": "src/contexts/DataContext.tsx",
+    "currentState": [
+      "products[]",
+      "orders[]",
+      "merchants[]",
+      "analytics{}"
+    ],
+    "neededAdditions": [
+      "templates[]",
+      "messages[]",
+      "broadcasts[]",
+      "approvalQueue[]",
+      "media[]"
+    ]
+  },
+  "services": {
+    "botApiClient.ts": {
+      "path": "src/services/botApiClient.ts",
+      "lines": 172,
+      "status": "✅ Good foundation",
+      "methods": [
+        "registerUser()",
+        "verifyUser()",
+        "saveMessage()",
+        "createOrder()",
+        "listProducts()",
+        "searchProducts()",
+        "addToCart()"
+      ],
+      "neededMethods": [
+        "createTemplate()",
+        "updateTemplate()",
+        "deleteTemplate()",
+        "getTemplates()",
+        "previewTemplate()",
+        "uploadImage()",
+        "compressImage()",
+        "broadcastTemplate()",
+        "approveM erchant()",
+        "rejectMerchant()"
+      ]
+    },
+    "whatsappService.ts": {
+      "path": "src/services/whatsappService.ts",
+      "status": "✅ Exists"
+    },
+    "webhookService.ts": {
+      "path": "src/services/webhookService.ts",
+      "status": "✅ Exists"
+    },
+    "authService.ts": {
+      "path": "src/services/authService.ts",
+      "status": "✅ Exists"
+    },
+    "dataService.ts": {
+      "path": "src/services/dataService.ts",
+      "status": "✅ Exists"
+    }
+  },
+  "requirements": {
+    "immediateChanges": [
+      "Add WebSocket client service (socket.io or native WS)",
+      "Extend BotApiClient with template methods",
+      "Create TemplateManager service",
+      "Create ImageUploadService with compression",
+      "Create ApprovalQueueService"
+    ],
+    "newPages": [
+      "TemplateManager.tsx (main template management)",
+      "QuickReplyBuilder.tsx (modal component)",
+      "MediaCarouselBuilder.tsx (modal component)",
+      "MerchantApprovalQueue.tsx (admin only)",
+      "CustomerHome.tsx (customer facing)",
+      "StoreListings.tsx (customer facing)",
+      "ProductDetail.tsx (customer facing)",
+      "CartCheckout.tsx (customer facing)",
+      "OrderTracking.tsx (customer facing)"
+    ],
+    "newComponents": [
+      "TemplateList.tsx",
+      "TemplateForm.tsx",
+      "TemplatePreview.tsx",
+      "ButtonBuilder.tsx",
+      "ListMessageBuilder.tsx",
+      "ImageUploader.tsx",
+      "ImageGallery.tsx",
+      "OrderQuickActions.tsx",
+      "DeliveryMap.tsx",
+      "StoreHoursEditor.tsx",
+      "ApprovalQueue.tsx",
+      "BroadcastManager.tsx",
+      "MerchantApprovalForm.tsx"
+    ]
+  },
+  "performanceNotes": {
+    "images": "Need image compression before upload; implement WebP format; lazy loading for galleries",
+    "realtime": "Add WebSocket (socket.io recommended) for order updates",
+    "caching": "Implement stale-while-revalidate for product lists, templates",
+    "storage": "Consider S3-like storage (MinIO for self-hosted)",
+    "pwa": "Add PWA manifest for offline access to merchant dashboard"
+  },
+  "priorityOrder": [
+    "1. Create Template Manager UI (highest impact)",
+    "2. Enhance ProductForm with 4-image enforcement",
+    "3. Add WebSocket for real-time orders",
+    "4. Build Merchant Approval Queue UI",
+    "5. Create Customer Site (home, store, product, cart)",
+    "6. Add Admin Panel enhancements",
+    "7. Implement UX improvements (dark mode, PWA)",
+    "8. Add tests and Storybook"
+  ],
+  "fileChangesRequired": {
+    "toModify": [
+      "src/pages/MerchantDashboard.tsx (add template link, real-time)",
+      "src/pages/SuperAdminDashboard.tsx (add approval queue)",
+      "src/components/merchant/ProductManagement.tsx (enhance UI)",
+      "src/components/merchant/ProductForm.tsx (major rewrite for 4 images)",
+      "src/components/merchant/OrderManagement.tsx (add WebSocket, quick actions)",
+      "src/components/merchant/Analytics.tsx (add mini-widgets)",
+      "src/components/merchant/MerchantSettings.tsx (add delivery, hours, broadcast settings)",
+      "src/contexts/DataContext.tsx (add templates, broadcasts, approval queue)",
+      "src/services/botApiClient.ts (add template methods)"
+    ],
+    "toCreate": [
+      "src/pages/TemplateManager.tsx",
+      "src/pages/CustomerHome.tsx",
+      "src/pages/StoreListings.tsx",
+      "src/pages/ProductDetail.tsx",
+      "src/pages/CartCheckout.tsx",
+      "src/pages/OrderTracking.tsx",
+      "src/components/merchant/TemplateList.tsx",
+      "src/components/merchant/TemplateForm.tsx",
+      "src/components/merchant/TemplatePreview.tsx",
+      "src/components/merchant/QuickReplyBuilder.tsx",
+      "src/components/merchant/MediaCarouselBuilder.tsx",
+      "src/components/merchant/ImageUploader.tsx",
+      "src/components/merchant/ImageGallery.tsx",
+      "src/components/merchant/OrderQuickActions.tsx",
+      "src/components/merchant/DeliveryMap.tsx",
+      "src/components/merchant/StoreHoursEditor.tsx",
+      "src/components/admin/MerchantApprovalQueue.tsx",
+      "src/components/admin/BroadcastManager.tsx",
+      "src/services/templateService.ts",
+      "src/services/imageUploadService.ts",
+      "src/services/websocketService.ts",
+      "src/services/approvalQueueService.ts",
+      "src/types/template.ts",
+      "src/types/broadcast.ts",
+      "src/hooks/useWebSocket.ts",
+      "src/hooks/useImageUpload.ts",
+      "src/hooks/useTemplate.ts"
+    ]
+  }
+}
