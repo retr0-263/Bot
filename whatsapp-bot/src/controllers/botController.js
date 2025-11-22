@@ -258,10 +258,6 @@ class BotController {
       });
     }
   }
-        options,
-      });
-    }
-  }
 
   /**
    * Process retry queue for failed messages
