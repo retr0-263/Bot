@@ -247,6 +247,9 @@ class SmartWhatsAppBot {
 
     // Handle presence updates
     this.sock.ev.on('presence.update', (presenceUpdates) => {
+      if (!presenceUpdates || !Array.isArray(presenceUpdates)) {
+        return;
+      }
       for (const { jid, lastKnownPresence } of presenceUpdates) {
         console.log(chalk.cyan(`👤 ${jid}: ${lastKnownPresence}`));
       }
