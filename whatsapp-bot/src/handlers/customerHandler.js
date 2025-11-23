@@ -7,6 +7,8 @@ const backendAPI = require('../api/backendAPI');
 const authMiddleware = require('../middlewares/auth');
 const cache = require('../database/cache');
 const MessageFormatter = require('../utils/messageFormatter');
+const InteractiveMessageBuilder = require('../utils/interactiveMessageBuilder');
+const FlowManager = require('../utils/flowManager');
 const Logger = require('../config/logger');
 
 const logger = new Logger('CustomerHandler');
@@ -104,7 +106,6 @@ class CustomerHandler {
    * !menu or !m
    */
   async handleMenuCommand(args, phoneNumber, from) {
-    // Dummy products for demo
     const dummyProducts = [
       { id: 'prod_001', name: 'Margherita Pizza', price: 2500, rating: 4.8, reviews: 156, merchant: 'Quick Eats', image: '🍕' },
       { id: 'prod_002', name: 'Fried Chicken Combo', price: 3200, rating: 4.6, reviews: 234, merchant: 'KFC Harare', image: '🍗' },
@@ -112,47 +113,24 @@ class CustomerHandler {
       { id: 'prod_004', name: 'Cold Bottle Coke', price: 350, rating: 4.7, reviews: 445, merchant: 'Refresh Shop', image: '🥤' },
       { id: 'prod_005', name: 'Beef Burger', price: 1500, rating: 4.5, reviews: 312, merchant: 'Burger King', image: '🍔' },
       { id: 'prod_006', name: 'Fresh Vegetables Pack', price: 800, rating: 4.8, reviews: 167, merchant: 'Farmers Market', image: '🥬' },
-      { id: 'prod_007', name: 'Grilled Fish Fillet', price: 2800, rating: 4.9, reviews: 203, merchant: 'Sea Foods', image: '🐟' },
-      { id: 'prod_008', name: 'Mixed Fruit Salad', price: 600, rating: 4.7, reviews: 134, merchant: 'Health Hub', image: '🥗' },
-      { id: 'prod_009', name: 'Chocolate Cake', price: 1200, rating: 4.8, reviews: 178, merchant: 'Sweet Treats', image: '🎂' },
-      { id: 'prod_010', name: 'Orange Juice 500ml', price: 280, rating: 4.6, reviews: 267, merchant: 'Fresh Juices', image: '🧃' },
-      { id: 'prod_011', name: 'Rice & Beans Meal', price: 1800, rating: 4.7, reviews: 189, merchant: 'Traditional Kitchen', image: '🍛' },
-      { id: 'prod_012', name: 'Chicken Sadza Combo', price: 2000, rating: 4.8, reviews: 156, merchant: 'Local Market', image: '🍲' },
     ];
 
     const response = await backendAPI.getProducts({});
-    const products = response?.success ? response.data.slice(0, 12) : dummyProducts;
+    const products = response?.success ? response.data.slice(0, 6) : dummyProducts;
 
-    let message = `
-╔════════════════════════════════════════════════════════════════════════╗
-║ 🛒  MENU - AVAILABLE PRODUCTS
-╠════════════════════════════════════════════════════════════════════════╣
-║
-`;
-
-    products.forEach((product, i) => {
-      const image = product.image || '📦';
-      const name = (product.name || 'Product').substring(0, 28);
-      const price = `ZWL ${(product.price || 0).toFixed(0)}`.substring(0, 10);
-      const rating = MessageFormatter.getStarRating(product.rating || 0);
-      message += `║ ${(i + 1).toString().padStart(2)}. ${image} ${name.padEnd(28)} │ ${price.padEnd(10)} │ ${rating}\n`;
-    });
-
-    message += `║
-╠════════════════════════════════════════════════════════════════════════╣
-║ 💡 HOW TO ORDER
-║ ┌────────────────────────────────────────────────────────────────────┐
-║ │ !add <number> <qty>  → Add to cart (e.g., !add 5 2)               │
-║ │ !search <name>       → Search for items (e.g., !search pizza)     │
-║ │ !cart                → View your shopping cart                    │
-║ │ !deals               → See special discounts                      │
-║ │ !trending            → Top trending items                         │
-║ └────────────────────────────────────────────────────────────────────┘
-║
-╚════════════════════════════════════════════════════════════════════════╝
-    `.trim();
-
-    return { message };
+    return InteractiveMessageBuilder.listMessage(
+      '🛒 MENU - PRODUCTS',
+      `Browse ${products.length} popular items`,
+      [{
+        title: 'Available Products',
+        rows: products.map((product, i) => ({
+          rowId: `add_${product.id}`,
+          title: `${product.image} ${product.name}`,
+          description: `ZWL ${product.price} • ⭐ ${product.rating}`
+        }))
+      }],
+      'Tap to add to cart'
+    );
   }
 
   /**
@@ -160,45 +138,33 @@ class CustomerHandler {
    */
   async handleSearchCommand(query, phoneNumber, from) {
     if (!query || query.length < 2) {
-      return { error: 'Search query too short. Try: !search noodles' };
+      return InteractiveMessageBuilder.createErrorCard(
+        'Search query too short',
+        ['Use at least 2 characters', 'Example: !search pizza']
+      );
     }
 
     const response = await backendAPI.searchProducts(query);
     if (!response.success || response.data.length === 0) {
-      return { message: `❌ No products found for "*${query}*"\n\n💡 Try searching with different keywords or browse categories with !categories` };
+      return InteractiveMessageBuilder.createErrorCard(
+        `No products found for "${query}"`,
+        ['Try different keywords', '!menu to see all items']
+      );
     }
 
-    let message = `
-╔════════════════════════════════════════════════╗
-║ 🔎  SEARCH RESULTS
-╠════════════════════════════════════════════════╣
-║ Query: *${query}*
-║ Found: ${response.data.length} results
-╠════════════════════════════════════════════════╣
-║
-`;
-    const results = response.data.slice(0, 10);
-
-    results.forEach((product, i) => {
-      message += `║ ${(i + 1).toString().padStart(2)}. *${product.name.substring(0, 25)}*
-║    🏪 ${product.merchant_name.substring(0, 25)}
-║    💰 ZWL ${product.price.toFixed(2).padEnd(8)} ⭐ ${product.rating || 'N/A'}
-║
-`;
-    });
-
-    if (response.data.length > 10) {
-      message += `║ ... and ${response.data.length - 10} more results\n║\n`;
-    }
-
-    message += `╠════════════════════════════════════════════════╣
-║ 🛒 Quick Action:
-║ !add <number> <quantity>
-║ Example: !add 3 2
-╚════════════════════════════════════════════════╝
-    `.trim();
-
-    return { message };
+    return InteractiveMessageBuilder.listMessage(
+      `🔎 SEARCH RESULTS`,
+      `Found ${response.data.length} items for "${query}"`,
+      [{
+        title: 'Products',
+        rows: response.data.slice(0, 10).map((product, i) => ({
+          rowId: `add_${product.id}`,
+          title: `${product.name}`,
+          description: `ZWL ${product.price} • ${product.merchant_name}`
+        }))
+      }],
+      response.data.length > 10 ? `Showing 10 of ${response.data.length}` : 'Tap to add'
+    );
   }
 
   /**
@@ -206,42 +172,51 @@ class CustomerHandler {
    */
   async handleCategoriesCommand(phoneNumber, from) {
     const categories = [
-      '🍔 Food & Restaurants',
-      '🛍️ Retail & Shopping',
-      '📚 Books & Media',
-      '👕 Fashion & Apparel',
-      '🏥 Health & Wellness',
-      '⚙️ Electronics',
-      '🌿 Groceries',
+      { emoji: '🍔', title: 'Food & Restaurants', id: 'cat_food' },
+      { emoji: '🛍️', title: 'Retail & Shopping', id: 'cat_retail' },
+      { emoji: '📚', title: 'Books & Media', id: 'cat_books' },
+      { emoji: '👕', title: 'Fashion & Apparel', id: 'cat_fashion' },
+      { emoji: '🏥', title: 'Health & Wellness', id: 'cat_health' },
+      { emoji: '⚙️', title: 'Electronics', id: 'cat_electronics' },
+      { emoji: '🌿', title: 'Groceries', id: 'cat_groceries' },
     ];
 
-    let message = `*📂 Product Categories*\n━━━━━━━━━━━━━━━\n\n`;
-    categories.forEach((cat, i) => {
-      message += `${i + 1}. ${cat}\n`;
-    });
-
-    message += `\nTo browse: *!search <category>*`;
-
-    return { message };
+    return InteractiveMessageBuilder.listMessage(
+      '📂 CATEGORIES',
+      'Browse by category',
+      [{
+        title: 'Available Categories',
+        rows: categories.map(cat => ({
+          rowId: cat.id,
+          title: `${cat.emoji} ${cat.title}`,
+          description: 'Tap to browse'
+        }))
+      }]
+    );
   }
 
   /**
    * !nearby [category]
    */
   async handleNearbyCommand(args, phoneNumber, from) {
-    const category = args[0] || 'all';
+    const stores = [
+      { emoji: '🏪', name: 'Supa Stores', distance: '2km', rating: 4.9, id: 'store_1' },
+      { emoji: '🏬', name: 'Quick Mart', distance: '3.5km', rating: 4.6, id: 'store_2' },
+      { emoji: '🥖', name: 'Local Bakery', distance: '1.2km', rating: 4.9, id: 'store_3' },
+    ];
 
-    let message = `*📍 Stores Near You*\n━━━━━━━━━━━━━━━\n\n`;
-    message += `Harare & Bulawayo Area:\n\n`;
-    message += `🏪 Top Stores:\n`;
-    message += `1. Supa Stores - 2km away ⭐⭐⭐⭐⭐\n`;
-    message += `2. Quick Mart - 3.5km away ⭐⭐⭐⭐\n`;
-    message += `3. Local Bakery - 1.2km away ⭐⭐⭐⭐⭐\n\n`;
-
-    message += `To view store: *!store <store_id>*\n`;
-    message += `To search items: *!search <item>*`;
-
-    return { message };
+    return InteractiveMessageBuilder.listMessage(
+      '📍 STORES NEAR YOU',
+      'Harare & Bulawayo Area',
+      [{
+        title: 'Top Stores',
+        rows: stores.map(store => ({
+          rowId: store.id,
+          title: `${store.emoji} ${store.name}`,
+          description: `${store.distance} • ⭐ ${store.rating}`
+        }))
+      }]
+    );
   }
 
   /**
@@ -265,29 +240,31 @@ class CustomerHandler {
    */
   async handleAddToCartCommand(args, phoneNumber, from) {
     if (!args[0] || !args[1]) {
-      return { error: 'Usage: !add <product_id> <quantity>\nExample: !add prod123 2' };
+      return InteractiveMessageBuilder.createErrorCard(
+        'Missing details',
+        ['Usage: !add <product_id> <quantity>', 'Example: !add prod123 2']
+      );
     }
 
     const productId = args[0];
     const quantity = parseInt(args[1]);
 
     if (isNaN(quantity) || quantity < 1) {
-      return { error: 'Invalid quantity. Must be a number ≥ 1' };
+      return InteractiveMessageBuilder.createErrorCard(
+        'Invalid quantity',
+        ['Must be a number ≥ 1']
+      );
     }
 
-    // Fetch product details
     const productRes = await backendAPI.getProductDetails(productId);
     if (!productRes.success) {
-      return { error: 'Product not found' };
+      return InteractiveMessageBuilder.createErrorCard('Product not found');
     }
 
     const product = productRes.data;
-
-    // Get current cart
     let cart = await cache.getUserCart(phoneNumber);
     if (!cart.items) cart.items = [];
 
-    // Check if product already in cart
     const existingItem = cart.items.find(item => item.id === productId);
     if (existingItem) {
       existingItem.quantity += quantity;
@@ -301,17 +278,17 @@ class CustomerHandler {
       });
     }
 
-    // Recalculate total
     cart.total = cart.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-
-    // Save cart
     await cache.setUserCart(phoneNumber, cart);
 
-    return {
-      message: MessageFormatter.formatSuccess(
-        `Added ${quantity}x ${product.name} to cart!\n\n💰 Cart Total: ZWL ${cart.total.toFixed(2)}\n\nType *!cart* to view or *!checkout* to order`
-      ),
-    };
+    return InteractiveMessageBuilder.createSuccessCard(
+      `${quantity}x ${product.name} added!`,
+      `Total in cart: ZWL ${cart.total.toFixed(2)}`,
+      [
+        { text: '🛒 View Cart', id: 'cart' },
+        { text: '➕ Add More', id: 'menu' }
+      ]
+    );
   }
 
   /**
@@ -319,22 +296,59 @@ class CustomerHandler {
    */
   async handleShowCartCommand(phoneNumber, from) {
     const cart = await cache.getUserCart(phoneNumber);
-    return { message: MessageFormatter.formatCart(cart) };
+    
+    if (!cart.items || cart.items.length === 0) {
+      return InteractiveMessageBuilder.createErrorCard(
+        'Your cart is empty',
+        ['Browse items: !menu', 'Search: !search <item>']
+      );
+    }
+
+    const itemSummary = cart.items.map((item, idx) => `${idx + 1}. ${item.name} x${item.quantity} = ZWL ${(item.price * item.quantity).toFixed(2)}`).join('\n');
+
+    let body = `*🛒 YOUR CART*\n━━━━━━━━━━━━━\n\n${itemSummary}\n\n`;
+    body += `💰 *Total: ZWL ${cart.total.toFixed(2)}*`;
+
+    return InteractiveMessageBuilder.templateButtonMessage(
+      body,
+      [
+        { text: '✅ Checkout', id: 'checkout' },
+        { text: '🗑️ Clear Cart', id: 'clear_cart' },
+        { text: '➕ Add More', id: 'menu' }
+      ]
+    );
   }
 
   /**
-   * !remove <item_index>
+   * !remove <item_index> - with interactive item selector
    */
   async handleRemoveFromCartCommand(itemIndex, phoneNumber, from) {
+    let cart = await cache.getUserCart(phoneNumber);
+
+    if (!cart.items || cart.items.length === 0) {
+      return InteractiveMessageBuilder.createErrorCard('Cart is empty');
+    }
+
+    // If no index provided, show interactive selector
     if (!itemIndex) {
-      return { error: 'Usage: !remove <item_index>\nGet index from !cart command' };
+      const removeOptions = cart.items.map((item, idx) => ({
+        id: `remove_${idx}`,
+        text: `🗑️ ${item.name} x${item.quantity}`,
+        value: idx + 1,
+        description: `ZWL ${(item.price * item.quantity).toFixed(2)}`
+      }));
+
+      return FlowManager.argumentSelectorFlow(
+        '🗑️ REMOVE FROM CART',
+        'Select item to remove',
+        removeOptions
+      ).interactive;
     }
 
     const index = parseInt(itemIndex) - 1;
-    let cart = await cache.getUserCart(phoneNumber);
 
     if (index < 0 || index >= cart.items.length) {
-      return { error: 'Invalid item index' };
+      return InteractiveMessageBuilder.createErrorCard('Invalid item index');
     }
 
     const removed = cart.items.splice(index, 1)[0];
@@ -342,11 +356,14 @@ class CustomerHandler {
 
     await cache.setUserCart(phoneNumber, cart);
 
-    return {
-      message: MessageFormatter.formatSuccess(
-        `Removed ${removed.name} from cart\n\nNew Total: ZWL ${cart.total.toFixed(2)}`
-      ),
-    };
+    return InteractiveMessageBuilder.createSuccessCard(
+      'Item Removed',
+      `${removed.name} removed from cart`,
+      [
+        { text: '🛒 View Cart', id: 'cart' },
+        { text: '➕ Add More', id: 'menu' }
+      ]
+    );
   }
 
   /**
@@ -510,73 +527,266 @@ class CustomerHandler {
   }
 
   /**
-   * !rate <order_id> <rating>
+   * !rate <order_id> [rating] - with interactive rating selector
    */
   async handleRateOrderCommand(orderId, rating, phoneNumber, from) {
-    if (!orderId || !rating) {
-      return { error: 'Usage: !rate <order_id> <rating_1_to_5>' };
+    if (!orderId) {
+      return InteractiveMessageBuilder.createErrorCard(
+        'Order ID required',
+        ['Usage: !rate <order_id> [rating]']
+      );
+    }
+
+    // If no rating provided, show interactive selector
+    if (!rating) {
+      const ratingOptions = [];
+      for (let i = 5; i >= 1; i--) {
+        const stars = '⭐'.repeat(i);
+        ratingOptions.push({
+          id: `rating_${i}`,
+          text: `${stars} ${i} Star${i !== 1 ? 's' : ''}`,
+          value: i,
+          description: i === 5 ? 'Excellent!' : i === 4 ? 'Good' : i === 3 ? 'Okay' : i === 2 ? 'Not great' : 'Poor'
+        });
+      }
+
+      return FlowManager.argumentSelectorFlow(
+        '⭐ RATE ORDER',
+        `How would you rate order #${orderId}?`,
+        ratingOptions
+      ).interactive;
     }
 
     const ratingNum = parseInt(rating);
     if (ratingNum < 1 || ratingNum > 5) {
-      return { error: 'Rating must be 1 to 5' };
+      return InteractiveMessageBuilder.createErrorCard(
+        'Invalid rating',
+        ['Rating must be 1 to 5']
+      );
     }
 
-    // Post rating to backend
     const response = await backendAPI.request('POST', `/api/orders/${orderId}/rating`, {
       customer_phone: phoneNumber,
       rating: ratingNum,
     });
 
     if (!response.success) {
-      return { error: 'Failed to save rating' };
+      return InteractiveMessageBuilder.createErrorCard('Failed to save rating');
     }
 
-    return { message: MessageFormatter.formatSuccess(`Thanks for your ${ratingNum}⭐ rating!`) };
+    return InteractiveMessageBuilder.createSuccessCard(
+      'Thanks for Rating!',
+      `You rated order #${orderId} with ${'⭐'.repeat(ratingNum)}`,
+      [
+        { text: '📦 View Orders', id: 'orders' },
+        { text: '📋 Menu', id: 'menu' }
+      ]
+    );
   }
 
   /**
-   * !favorites [add|remove|list] <store_id>
+   * !favorites [add|remove|list] [store_id] - with interactive action selector
    */
   async handleFavoritesCommand(args, phoneNumber, from) {
-    const action = args[0]?.toLowerCase() || 'list';
+    const action = args[0]?.toLowerCase();
+
+    // If no action provided, show interactive selector
+    if (!action) {
+      const actionOptions = [
+        {
+          id: 'fav_list',
+          text: '❤️ View Favorites',
+          description: 'See all your favorite stores'
+        },
+        {
+          id: 'fav_add',
+          text: '➕ Add Store',
+          description: 'Add a store to favorites'
+        },
+        {
+          id: 'fav_remove',
+          text: '➖ Remove Store',
+          description: 'Remove a store from favorites'
+        }
+      ];
+
+      return FlowManager.argumentSelectorFlow(
+        '❤️ MY FAVORITES',
+        'What would you like to do?',
+        actionOptions
+      ).interactive;
+    }
 
     if (action === 'list') {
-      let message = `*❤️ Your Favorite Stores*\n━━━━━━━━━━━━━━━\n\n`;
-      message += `1. Supa Stores\n2. Quick Mart\n3. Local Bakery\n\n`;
-      message += `To add: *!favorites add <store_id>*\n`;
-      message += `To remove: *!favorites remove <store_id>*`;
+      const favorites = [
+        { id: 'store_1', text: '🏪 Supa Stores', description: 'Grocery & household items' },
+        { id: 'store_2', text: '🏬 Quick Mart', description: 'General merchandise' },
+        { id: 'store_3', text: '🥖 Local Bakery', description: 'Fresh baked goods' }
+      ];
 
-      return { message };
+      return InteractiveMessageBuilder.listMessage(
+        '❤️ Your Favorite Stores',
+        'Tap a store to view',
+        [{
+          title: 'Favorite Stores',
+          rows: favorites
+        }]
+      );
     }
 
-    if (action === 'add' && args[1]) {
-      return { message: MessageFormatter.formatSuccess(`Store added to favorites!`) };
+    if (action === 'add') {
+      if (!args[1]) {
+        return InteractiveMessageBuilder.createErrorCard(
+          'Store ID required',
+          ['Usage: !favorites add <store_id>']
+        );
+      }
+
+      return InteractiveMessageBuilder.createSuccessCard(
+        'Store Added!',
+        `Store #${args[1]} added to your favorites ❤️`,
+        [
+          { text: '❤️ View Favorites', id: 'favorites' },
+          { text: '🏪 Browse', id: 'menu' }
+        ]
+      );
     }
 
-    if (action === 'remove' && args[1]) {
-      return { message: MessageFormatter.formatSuccess(`Store removed from favorites`) };
+    if (action === 'remove') {
+      if (!args[1]) {
+        // Show list to select from
+        const favorites = [
+          { id: 'remove_1', text: '🏪 Supa Stores', description: 'Remove from favorites' },
+          { id: 'remove_2', text: '🏬 Quick Mart', description: 'Remove from favorites' },
+          { id: 'remove_3', text: '🥖 Local Bakery', description: 'Remove from favorites' }
+        ];
+
+        return InteractiveMessageBuilder.listMessage(
+          '➖ Remove from Favorites',
+          'Select a store to remove',
+          [{
+            title: 'Your Favorites',
+            rows: favorites
+          }]
+        );
+      }
+
+      return InteractiveMessageBuilder.createSuccessCard(
+        'Removed!',
+        `Store #${args[1]} removed from favorites`,
+        [
+          { text: '❤️ View Favorites', id: 'favorites' },
+          { text: '🏪 Browse', id: 'menu' }
+        ]
+      );
     }
 
-    return { error: 'Usage: !favorites [list|add|remove] [store_id]' };
+    return InteractiveMessageBuilder.createErrorCard(
+      'Invalid action',
+      ['Usage: !favorites [list|add|remove]']
+    );
   }
 
   /**
-   * !addresses [list|add|remove] [address]
+   * !addresses [list|add|remove] [address] - with interactive action selector
    */
   async handleAddressesCommand(args, phoneNumber, from) {
-    const action = args[0]?.toLowerCase() || 'list';
+    const action = args[0]?.toLowerCase();
 
-    if (action === 'list') {
-      let message = `*📍 Your Delivery Addresses*\n━━━━━━━━━━━━━━━\n\n`;
-      message += `1. 123 Main Street, Harare\n2. 456 Work Ave, CBD\n\n`;
-      message += `To add: *!addresses add <address>*\n`;
-      message += `To remove: *!addresses remove <number>*`;
+    // If no action provided, show interactive selector
+    if (!action) {
+      const actionOptions = [
+        {
+          id: 'addr_list',
+          text: '📍 View Addresses',
+          description: 'See all your delivery addresses'
+        },
+        {
+          id: 'addr_add',
+          text: '➕ Add Address',
+          description: 'Add a new delivery address'
+        },
+        {
+          id: 'addr_remove',
+          text: '➖ Remove Address',
+          description: 'Remove a delivery address'
+        }
+      ];
 
-      return { message };
+      return FlowManager.argumentSelectorFlow(
+        '📍 MY ADDRESSES',
+        'What would you like to do?',
+        actionOptions
+      ).interactive;
     }
 
-    return { error: 'Usage: !addresses [list|add|remove]' };
+    if (action === 'list') {
+      const addresses = [
+        { id: 'addr_1', text: '🏠 123 Main Street, Harare', description: 'Home' },
+        { id: 'addr_2', text: '🏢 456 Work Ave, CBD', description: 'Office' }
+      ];
+
+      return InteractiveMessageBuilder.listMessage(
+        '📍 Your Delivery Addresses',
+        'Tap to select or manage',
+        [{
+          title: 'Saved Addresses',
+          rows: addresses
+        }]
+      );
+    }
+
+    if (action === 'add') {
+      if (!args[1]) {
+        return InteractiveMessageBuilder.createErrorCard(
+          'Address details required',
+          ['Usage: !addresses add <street>, <area>, <city>']
+        );
+      }
+
+      const address = args.slice(1).join(' ');
+      return InteractiveMessageBuilder.createSuccessCard(
+        'Address Added!',
+        `✅ New address saved: ${address}`,
+        [
+          { text: '📍 View All', id: 'addresses' },
+          { text: '🛒 Continue Shopping', id: 'menu' }
+        ]
+      );
+    }
+
+    if (action === 'remove') {
+      if (!args[1]) {
+        // Show list to select from
+        const addresses = [
+          { id: 'remove_addr_1', text: '🏠 123 Main Street, Harare', description: 'Tap to remove' },
+          { id: 'remove_addr_2', text: '🏢 456 Work Ave, CBD', description: 'Tap to remove' }
+        ];
+
+        return InteractiveMessageBuilder.listMessage(
+          '➖ Remove Address',
+          'Select an address to remove',
+          [{
+            title: 'Your Addresses',
+            rows: addresses
+          }]
+        );
+      }
+
+      return InteractiveMessageBuilder.createSuccessCard(
+        'Removed!',
+        `Address #${args[1]} removed`,
+        [
+          { text: '📍 View All', id: 'addresses' },
+          { text: '🛒 Continue Shopping', id: 'menu' }
+        ]
+      );
+    }
+
+    return InteractiveMessageBuilder.createErrorCard(
+      'Invalid action',
+      ['Usage: !addresses [list|add|remove]']
+    );
   }
 
   /**

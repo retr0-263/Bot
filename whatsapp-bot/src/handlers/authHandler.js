@@ -7,6 +7,8 @@ const backendAPI = require('../api/backendAPI');
 const authMiddleware = require('../middlewares/auth');
 const cache = require('../database/cache');
 const MessageFormatter = require('../utils/messageFormatter');
+const InteractiveMessageBuilder = require('../utils/interactiveMessageBuilder');
+const FlowManager = require('../utils/flowManager');
 const commandParser = require('../utils/commandParser');
 const Logger = require('../config/logger');
 const constants = require('../config/constants');
@@ -71,11 +73,15 @@ class AuthHandler {
       return { message: '✓ You\'re already registered! Type !login to continue.' };
     }
 
-    // Start registration flow
-    return {
-      message: `👋 *Welcome to Smart Bot!*\n\nLet's get you registered.\n\n📝 *What's your name?*\n\n(Just reply with your name)`,
-      flowType: 'register_step1',
-    };
+    return InteractiveMessageBuilder.buttonMessage(
+      '👋 Welcome to Smart Bot',
+      'Let\'s get you registered',
+      [
+        { id: 'register_customer', text: '🛍️ As Customer', label: 'Customer' },
+        { id: 'register_merchant', text: '🏪 As Merchant', label: 'Merchant' }
+      ],
+      '━━━━━━━━━━━━━━━'
+    );
   }
 
   /**
@@ -87,10 +93,15 @@ class AuthHandler {
       return { message: `✓ Welcome back! You're already logged in.` };
     }
 
-    return {
-      message: `📱 *Logging you in...*\n\nEnter your verification code:\n\n(Reply: !verify CODE)`,
-      flowType: 'login_step1',
-    };
+    return InteractiveMessageBuilder.buttonMessage(
+      '📱 Login to Smart Bot',
+      'Select your login method',
+      [
+        { id: 'login_otp', text: '📲 OTP Code', label: 'Use OTP' },
+        { id: 'login_phone', text: '📞 Phone Number', label: 'Phone Verify' }
+      ],
+      '━━━━━━━━━━━━━━━'
+    );
   }
 
   /**
@@ -98,21 +109,23 @@ class AuthHandler {
    */
   async handleVerifyCommand(args, from, phoneNumber) {
     if (!args[0]) {
-      return { error: 'Usage: !verify <otp_code>' };
+      return InteractiveMessageBuilder.createErrorCard(
+        'OTP required',
+        ['Usage: !verify <otp_code>', 'Check your SMS for the code']
+      );
     }
 
     const otp = args[0];
-
-    // Verify with backend
     const response = await backendAPI.loginUser(phoneNumber, otp);
 
     if (!response.success) {
-      return { error: 'Invalid OTP. Please try again or request a new one.' };
+      return InteractiveMessageBuilder.createErrorCard(
+        'Invalid OTP',
+        ['Try again', 'Request new OTP']
+      );
     }
 
     const user = response.data;
-
-    // Save authenticated session
     await cache.setUserSession(phoneNumber, {
       ...user,
       authenticated: true,
@@ -121,19 +134,18 @@ class AuthHandler {
 
     logger.success(`User authenticated: ${phoneNumber}`);
 
-    let message = `✅ *Login Successful*\n\n`;
-    message += `Welcome ${user.name}!\n\n`;
-    message += `Role: ${user.role === 'admin' ? '👨‍💼 Admin' : user.role === 'merchant' ? '🏪 Merchant' : '🛍️ Customer'}\n\n`;
+    const roleEmoji = user.role === 'admin' ? '👨‍💼' : user.role === 'merchant' ? '🏪' : '🛍️';
+    const nextActions = user.role === 'admin' 
+      ? [{ text: '📊 Stats', id: 'admin_stats' }]
+      : user.role === 'merchant'
+      ? [{ text: '📦 Orders', id: 'merchant_orders' }]
+      : [{ text: '🛒 Menu', id: 'customer_menu' }];
 
-    if (user.role === 'admin') {
-      message += `Type *!help* to see admin commands`;
-    } else if (user.role === 'merchant') {
-      message += `Type *!help* to see merchant commands`;
-    } else {
-      message += `Type *!help* to see customer commands`;
-    }
-
-    return { message };
+    return InteractiveMessageBuilder.createSuccessCard(
+      'Login Successful',
+      `Welcome ${user.name}!\nRole: ${roleEmoji} ${user.role}`,
+      nextActions
+    );
   }
 
   /**
@@ -141,7 +153,11 @@ class AuthHandler {
    */
   async handleLogoutCommand(from, phoneNumber) {
     await cache.setUserSession(phoneNumber, { authenticated: false });
-    return { message: '✅ Logged out successfully!' };
+    return InteractiveMessageBuilder.createSuccessCard(
+      'Logged Out',
+      'You have been successfully logged out',
+      [{ text: '🔑 Login Again', id: 'login' }]
+    );
   }
 
   /**
@@ -154,21 +170,29 @@ class AuthHandler {
       return { message: 'Please login first with !login' };
     }
 
-    let message = `*👤 Your Profile*\n━━━━━━━━━━━━━━━\n\n`;
-    message += `Name: ${session.name}\n`;
-    message += `Phone: ${phoneNumber}\n`;
-    message += `Role: ${session.role}\n`;
-    message += `Status: ${session.status || 'Active'}\n`;
+    const profileItems = [
+      { emoji: '👤', label: 'Name', value: session.name },
+      { emoji: '📱', label: 'Phone', value: phoneNumber },
+      { emoji: '🎭', label: 'Role', value: session.role },
+      { emoji: '✅', label: 'Status', value: session.status || 'Active' }
+    ];
 
     if (session.role === 'merchant') {
-      message += `\nBusiness: ${session.business_name || 'N/A'}\n`;
-      message += `Category: ${session.category || 'N/A'}\n`;
-      message += `Approval: ${session.approval_status || 'Pending'}\n`;
+      profileItems.push(
+        { emoji: '🏪', label: 'Business', value: session.business_name || 'N/A' },
+        { emoji: '📂', label: 'Category', value: session.category || 'N/A' },
+        { emoji: '📋', label: 'Approval', value: session.approval_status || 'Pending' }
+      );
     }
 
-    message += `\nJoined: ${new Date(session.authenticated_at).toLocaleDateString()}\n`;
-
-    return { message };
+    return InteractiveMessageBuilder.createStatusCard(
+      '👤 YOUR PROFILE',
+      profileItems,
+      [
+        { text: '✏️ Edit', id: 'edit_profile' },
+        { text: '📋 Menu', id: 'menu' }
+      ]
+    );
   }
 
   /**
@@ -294,55 +318,66 @@ Shows user count, orders, revenue, etc.
   }
 
   /**
-   * !owner - Bot owner contact
+   * !owner - Bot owner contact (with save and direct contact options)
    */
   async handleOwnerCommand(from, phoneNumber) {
-    return {
-      message: `👨‍💼 *Bot Owner - Hxcker-263*
-
-📱 WhatsApp: +263781564004
-💼 Role: Developer & Founder
-
-🔗 Contact: wa.me/263781564004
-⏰ Available: 24/7
-
-*Services:*
-• WhatsApp Bot Development
-• E-commerce Solutions
-• Custom Integration
-
-━━━━━━━━━━━━━━━━━━━━━━━
-Feel free to reach out! 💙`,
+    const ownerInfo = {
+      name: 'Hacker263',
+      phone: '+263781564004',
+      role: 'Developer & Founder',
+      org: 'Smart WhatsApp Bot',
+      email: 'hacker263@smartbot.dev',
+      website: 'www.smartbot.dev',
+      services: ['WhatsApp Bot Development', 'E-commerce Solutions', 'Custom Integration'],
+      availability: '24/7',
+      bio: 'Passionate developer creating innovative WhatsApp solutions'
     };
+
+    // Build detailed owner info message
+    let ownerBody = `*👨‍💼 ${ownerInfo.name}*\n━━━━━━━━━━━━━━━\n\n`;
+    ownerBody += `🎭 *Role:* ${ownerInfo.role}\n`;
+    ownerBody += `🏢 *Organization:* ${ownerInfo.org}\n`;
+    ownerBody += `📱 *WhatsApp:* ${ownerInfo.phone}\n`;
+    ownerBody += `📧 *Email:* ${ownerInfo.email}\n`;
+    ownerBody += `🌐 *Website:* ${ownerInfo.website}\n`;
+    ownerBody += `⏰ *Available:* ${ownerInfo.availability}\n\n`;
+    ownerBody += `💼 *Services:*\n`;
+    ownerInfo.services.forEach(service => {
+      ownerBody += `  ✓ ${service}\n`;
+    });
+    ownerBody += `\n📝 *Bio:* ${ownerInfo.bio}`;
+
+    // Save owner info to user's local cache for quick access
+    await cache.setOwnerContact(phoneNumber, ownerInfo);
+
+    return InteractiveMessageBuilder.templateButtonMessage(
+      ownerBody,
+      [
+        { id: 'contact_save', text: '💾 Save Contact', label: 'Save' },
+        { id: 'contact_whatsapp', text: '💬 Message', label: 'Chat' },
+        { id: 'contact_call', text: '☎️ Call', label: 'Call' }
+      ],
+      '━━━━━━━━━━━━━━━━━━━━━━━'
+    );
   }
 
   /**
    * !about - Platform info
    */
   async handleAboutCommand(from, phoneNumber) {
-    return {
-      message: `ℹ️ *About Smart WhatsApp Bot*
-
-🚀 *What is it?*
-E-commerce platform on WhatsApp
-
-📱 *Who uses it?*
-• Customers - Shop anytime
-• Merchants - Sell easily
-• Admins - Manage all
-
-✨ *Features:*
-🛍️ Browse & Search Products
-🏪 Multi-Merchant Support
-📦 Order Tracking
-💳 Easy Checkout
-📊 Merchant Analytics
-⭐ Ratings & Reviews
-
-🌍 Region: Zimbabwe & Beyond
-━━━━━━━━━━━━━━━━━━━━━━━
-Type !owner for developer contact`,
-    };
+    return InteractiveMessageBuilder.createStatusCard(
+      'ℹ️ ABOUT SMART BOT',
+      [
+        { emoji: '🚀', label: 'What', value: 'E-commerce on WhatsApp' },
+        { emoji: '👥', label: 'Users', value: 'Customers, Merchants, Admins' },
+        { emoji: '🌍', label: 'Region', value: 'Zimbabwe & Beyond' },
+        { emoji: '⭐', label: 'Rating', value: '4.8/5.0' }
+      ],
+      [
+        { text: '🛍️ Start Shopping', id: 'menu' },
+        { text: '📱 Contact', id: 'owner' }
+      ]
+    );
   }
 
   /**
@@ -350,17 +385,24 @@ Type !owner for developer contact`,
    */
   async handleFeedbackCommand(message, from, phoneNumber) {
     if (!message) {
-      return {
-        message: `💬 *Tell us what you think!*\n\n!feedback [your message]\n\nExample:\n!feedback Great app! But fix the search`,
-        flowType: 'feedback_step1',
-      };
+      return InteractiveMessageBuilder.buttonMessage(
+        '💬 Send Feedback',
+        'Tell us what you think about Smart Bot',
+        [
+          { id: 'feedback_positive', text: '👍 I Love It' },
+          { id: 'feedback_issue', text: '⚠️ Found an Issue' },
+          { id: 'feedback_suggestion', text: '💡 Suggestion' }
+        ]
+      );
     }
 
     await cache.addCommandHistory(phoneNumber, `feedback: ${message}`);
 
-    return {
-      message: `✓ Thanks for the feedback! 💙\n\n"${message}"\n\nWe'll review it soon.`,
-    };
+    return InteractiveMessageBuilder.createSuccessCard(
+      'Feedback Received',
+      `Thanks for your feedback: "${message}"`,
+      [{ text: '📋 Menu', id: 'menu' }]
+    );
   }
 
   /**
@@ -377,26 +419,23 @@ Type !owner for developer contact`,
       avgRating: 4.8,
     };
 
-    return {
-      message: `📊 *Platform Statistics*
+    const statsItems = [
+      { emoji: '👥', label: 'Total Users', value: stats.totalUsers.toLocaleString() },
+      { emoji: '🏪', label: 'Merchants', value: stats.totalMerchants },
+      { emoji: '📦', label: 'Orders', value: stats.totalOrders.toLocaleString() },
+      { emoji: '💰', label: 'Revenue', value: `ZWL ${stats.totalRevenue.toLocaleString()}` },
+      { emoji: '⭐', label: 'Rating', value: `${stats.avgRating}/5.0` },
+      { emoji: '🟢', label: 'Active Now', value: stats.activeNow }
+    ];
 
-👥 *Users:*
-• Total: ${stats.totalUsers.toLocaleString()}
-• Merchants: ${stats.totalMerchants}
-• Active Now: ${stats.activeNow} 🟢
-
-📦 *Orders & Sales:*
-• Total Orders: ${stats.totalOrders.toLocaleString()}
-• Revenue: ZWL ${stats.totalRevenue.toLocaleString()}
-• Avg Order: ZWL ${stats.avgOrderValue}
-
-📈 *Insights:*
-• Rating: ⭐ ${stats.avgRating}/5
-• Growth: ↗️ 15% this month
-
-━━━━━━━━━━━━━━━━━━━━━━━
-Powered by Smart WhatsApp Bot`,
-    };
+    return InteractiveMessageBuilder.createStatusCard(
+      '📊 PLATFORM STATS',
+      statsItems,
+      [
+        { text: '🛒 Shop Now', id: 'menu' },
+        { text: '📱 Contact', id: 'owner' }
+      ]
+    );
   }
 }
 

@@ -7,6 +7,8 @@ const backendAPI = require('../api/backendAPI');
 const authMiddleware = require('../middlewares/auth');
 const cache = require('../database/cache');
 const MessageFormatter = require('../utils/messageFormatter');
+const InteractiveMessageBuilder = require('../utils/interactiveMessageBuilder');
+const FlowManager = require('../utils/flowManager');
 const Logger = require('../config/logger');
 
 const logger = new Logger('MerchantHandler');
@@ -117,7 +119,7 @@ class MerchantHandler {
     });
 
     if (!response.success) {
-      return { error: 'Failed to fetch orders' };
+      return InteractiveMessageBuilder.createErrorCard('Failed to fetch orders');
     }
 
     const orders = response.data;
@@ -125,22 +127,19 @@ class MerchantHandler {
       return { message: `No ${timeframe} orders found.` };
     }
 
-    let message = `*${timeframe.toUpperCase()} ORDERS (${orders.length})*\n━━━━━━━━━━━━━━━\n\n`;
-
-    orders.slice(0, 10).forEach((order, i) => {
-      message += `${i + 1}. Order #${order.id}\n`;
-      message += `   Customer: ${order.customer_name} (${order.customer_phone})\n`;
-      message += `   Items: ${order.items_count || order.items?.length}\n`;
-      message += `   Total: ZWL ${order.total.toFixed(2)}\n`;
-      message += `   Status: ${MessageFormatter.getStatusEmoji(order.status)} ${order.status}\n`;
-      message += `   Time: ${new Date(order.created_at).toLocaleTimeString()}\n\n`;
-    });
-
-    message += `To accept: *!merchant accept <order_id>*\n`;
-    message += `To reject: *!merchant reject <order_id> [reason]*\n`;
-    message += `To update: *!merchant update-status <order_id> <status>*`;
-
-    return { message };
+    return InteractiveMessageBuilder.listMessage(
+      `${timeframe.toUpperCase()} ORDERS`,
+      `${orders.length} order${orders.length !== 1 ? 's' : ''}`,
+      [{
+        title: 'Orders',
+        rows: orders.slice(0, 10).map((order, i) => ({
+          rowId: `order_${order.id}`,
+          title: `#${order.id} - ${order.customer_name}`,
+          description: `ZWL ${order.total.toFixed(2)} • ${order.status}`
+        }))
+      }],
+      'Tap to view details'
+    );
   }
 
   /**
@@ -148,22 +147,27 @@ class MerchantHandler {
    */
   async handleAcceptOrderCommand(orderId, merchantId, from) {
     if (!orderId) {
-      return { error: 'Usage: !merchant accept <order_id>' };
+      return InteractiveMessageBuilder.createErrorCard(
+        'Order ID required',
+        ['Usage: !merchant accept <order_id>']
+      );
     }
 
     const response = await backendAPI.updateOrderStatus(orderId, 'confirmed', merchantId);
 
     if (!response.success) {
-      return { error: 'Failed to accept order' };
+      return InteractiveMessageBuilder.createErrorCard('Failed to accept order');
     }
 
     const order = response.data;
-    const customerMessage = `✅ *Your order #${order.id} has been accepted!*\n\nMerchant: ${order.merchant_name}\nEstimated time: ${order.estimated_time || '30-45 mins'}\n\nYou'll be notified when it's ready.`;
-
-    return {
-      message: MessageFormatter.formatSuccess('Order accepted!'),
-      notifyUser: { phone: order.customer_phone, message: customerMessage },
-    };
+    return InteractiveMessageBuilder.createSuccessCard(
+      'Order Accepted',
+      `Order #${order.id} confirmed!\nCustomer: ${order.customer_name}`,
+      [
+        { text: '📦 View Orders', id: 'merchant_orders' },
+        { text: '📋 Menu', id: 'menu' }
+      ]
+    );
   }
 
   /**
@@ -190,38 +194,52 @@ class MerchantHandler {
   }
 
   /**
-   * !merchant update-status <order_id> <status>
+   * !merchant update-status <order_id> [status]
+   * Now with interactive status selector
    */
   async handleUpdateOrderStatusCommand(orderId, status, merchantId, from) {
-    if (!orderId || !status) {
-      return { error: 'Usage: !merchant update-status <order_id> <status>' };
+    if (!orderId) {
+      return InteractiveMessageBuilder.createErrorCard(
+        'Order ID required',
+        ['Usage: !merchant update-status <order_id> <status>']
+      );
+    }
+
+    // If no status provided, show interactive selector
+    if (!status) {
+      return FlowManager.statusSelectorFlow('Pending').interactive;
     }
 
     const validStatuses = ['preparing', 'ready', 'out_for_delivery', 'delivered'];
     if (!validStatuses.includes(status.toLowerCase())) {
-      return { error: `Invalid status. Valid: ${validStatuses.join(', ')}` };
+      return InteractiveMessageBuilder.createErrorCard(
+        'Invalid status',
+        validStatuses.map(s => `• ${s}`)
+      );
     }
 
     const response = await backendAPI.updateOrderStatus(orderId, status, merchantId);
 
     if (!response.success) {
-      return { error: 'Failed to update order' };
+      return InteractiveMessageBuilder.createErrorCard('Failed to update order');
     }
 
     const order = response.data;
-    const statusMessages = {
-      preparing: '👨‍🍳 Your order is being prepared!',
-      ready: '📦 Your order is ready for pickup/delivery!',
-      out_for_delivery: '🚚 Your order is on the way!',
-      delivered: '✅ Your order has been delivered!',
+    const statusEmojis = {
+      preparing: '👨‍🍳',
+      ready: '📦',
+      out_for_delivery: '🚚',
+      delivered: '✅'
     };
 
-    const customerMessage = `${MessageFormatter.getStatusEmoji(status)} *Order Update*\n\n${statusMessages[status]}\n\nOrder #${order.id}`;
-
-    return {
-      message: MessageFormatter.formatSuccess(`Order status updated to ${status}`),
-      notifyUser: { phone: order.customer_phone, message: customerMessage },
-    };
+    return InteractiveMessageBuilder.createSuccessCard(
+      'Order Updated',
+      `Order #${order.id}\nStatus: ${statusEmojis[status]} ${status}`,
+      [
+        { text: '📦 View Orders', id: 'merchant_orders' },
+        { text: '📋 Menu', id: 'menu' }
+      ]
+    );
   }
 
   /**
@@ -443,25 +461,21 @@ What would you like to edit?
     const ordersRes = await backendAPI.getMerchantOrders(merchantId, { status: 'pending' });
     const analyticsRes = await backendAPI.getMerchantAnalytics(merchantId, 'today');
 
-    let message = `*🏪 Merchant Dashboard*\n━━━━━━━━━━━━━━━\n\n`;
+    const dashboardItems = [
+      { emoji: '📦', label: 'New Orders', value: ordersRes.success ? ordersRes.data.filter(o => o.status === 'pending').length : 0 },
+      { emoji: '💰', label: "Today's Revenue", value: analyticsRes.success ? `ZWL ${(analyticsRes.data.revenue_today || 0).toFixed(2)}` : 'N/A' },
+      { emoji: '📊', label: "Today's Orders", value: analyticsRes.success ? analyticsRes.data.orders_today || 0 : 0 }
+    ];
 
-    if (ordersRes.success) {
-      const newOrders = ordersRes.data.filter(o => o.status === 'pending').length;
-      message += `📦 New Orders: ${newOrders}\n`;
-    }
-
-    if (analyticsRes.success) {
-      message += `💰 Today's Revenue: ZWL ${(analyticsRes.data.revenue_today || 0).toFixed(2)}\n`;
-      message += `📊 Orders Today: ${analyticsRes.data.orders_today || 0}\n`;
-    }
-
-    message += `\nQuick Links:\n`;
-    message += `!merchant orders new\n`;
-    message += `!merchant analytics\n`;
-    message += `!merchant products\n`;
-    message += `!merchant store`;
-
-    return { message };
+    return InteractiveMessageBuilder.createStatusCard(
+      '🏪 MERCHANT DASHBOARD',
+      dashboardItems,
+      [
+        { text: '📦 View Orders', id: 'merchant_orders' },
+        { text: '📊 Analytics', id: 'merchant_analytics' },
+        { text: '📋 Menu', id: 'menu' }
+      ]
+    );
   }
 
   /**
@@ -492,7 +506,6 @@ What would you like to edit?
    * !merchant performance - Show sales performance metrics
    */
   async handlePerformanceCommand(merchantId, from) {
-    // Dummy performance data
     const perf = {
       ordersToday: 24,
       ordersWeek: 156,
@@ -504,83 +517,49 @@ What would you like to edit?
       deliveryAccuracy: 98.2,
     };
 
-    return {
-      message: `
-╔════════════════════════════════════════════════════════════════════════╗
-║ 📊  SALES PERFORMANCE METRICS
-╠════════════════════════════════════════════════════════════════════════╣
-║
-║ 📈 TODAY'S PERFORMANCE
-║ ┌────────────────────────────────────────────────────────────────────┐
-║ │ Orders:              ${String(perf.ordersToday).padEnd(45)}
-║ │ Revenue:             ZWL ${String(perf.revenue24h.toLocaleString()).padEnd(40)}
-║ │ Avg Order Value:     ZWL ${String(perf.avgOrderValue).padEnd(45)}
-║ └────────────────────────────────────────────────────────────────────┘
-║
-║ 📅 THIS WEEK
-║ ┌────────────────────────────────────────────────────────────────────┐
-║ │ Total Orders:        ${String(perf.ordersWeek).padEnd(45)}
-║ │ Total Revenue:       ZWL ${String(perf.revenueWeek.toLocaleString()).padEnd(40)}
-║ │ Daily Average:       ZWL ${String(Math.round(perf.revenueWeek / 7).toLocaleString()).padEnd(40)}
-║ └────────────────────────────────────────────────────────────────────┘
-║
-║ 🌟 QUALITY METRICS
-║ ├─ Customer Satisfaction: ${perf.customerSatisfaction}/5.0 ⭐
-║ ├─ Order Completion Rate: ${perf.completionRate}% ✅
-║ └─ On-time Delivery:      ${perf.deliveryAccuracy}% 🚚
-║
-║ 💡 Insights:
-║ • Your store is performing GREAT this week!
-║ • Focus on reducing order cancellation
-║ • Maintain high service quality (you're at 4.8⭐)
-║
-╚════════════════════════════════════════════════════════════════════════╝
-      `.trim(),
-    };
+    const statsItems = [
+      { emoji: '📈', label: "Today's Orders", value: perf.ordersToday },
+      { emoji: '💰', label: "Today's Revenue", value: `ZWL ${perf.revenue24h.toLocaleString()}` },
+      { emoji: '⭐', label: 'Customer Satisfaction', value: `${perf.customerSatisfaction}/5.0` },
+      { emoji: '✅', label: 'Completion Rate', value: `${perf.completionRate}%` },
+      { emoji: '🚚', label: 'On-time Delivery', value: `${perf.deliveryAccuracy}%` }
+    ];
+
+    return InteractiveMessageBuilder.createStatusCard(
+      '📊 PERFORMANCE METRICS',
+      statsItems,
+      [
+        { text: '📋 Analytics', id: 'merchant_analytics' },
+        { text: '📋 Menu', id: 'menu' }
+      ]
+    );
   }
 
   /**
    * !merchant customers - Show customer insights
    */
   async handleCustomersCommand(args, merchantId, from) {
-    const action = args[0]?.toLowerCase() || 'list';
+    const topCustomers = [
+      { name: 'John M', orders: 23, spent: 54500 },
+      { name: 'Sarah K', orders: 19, spent: 38200 },
+      { name: 'Alex D', orders: 17, spent: 42800 },
+      { name: 'Maria P', orders: 15, spent: 36000 },
+      { name: 'David T', orders: 14, spent: 33600 }
+    ];
 
-    if (action === 'list') {
-      return {
-        message: `
-╔════════════════════════════════════════════════════════════════════════╗
-║ 👥  YOUR CUSTOMERS
-╠════════════════════════════════════════════════════════════════════════╣
-║
-║ 📊 CUSTOMER STATISTICS
-║ ┌────────────────────────────────────────────────────────────────────┐
-║ │ Total Customers:       342
-║ │ New This Month:        47
-║ │ Regular (3+ orders):   156
-║ │ VIP (10+ orders):      23
-║ │ Churned (30 days):     18
-║ └────────────────────────────────────────────────────────────────────┘
-║
-║ 🌟 TOP CUSTOMERS (By Orders)
-║ ┌────────────────────────────────────────────────────────────────────┐
-║ │ 1. John M (23 orders) → ZWL 54,500 spent
-║ │ 2. Sarah K (19 orders) → ZWL 38,200 spent
-║ │ 3. Alex D (17 orders) → ZWL 42,800 spent
-║ │ 4. Maria P (15 orders) → ZWL 36,000 spent
-║ │ 5. David T (14 orders) → ZWL 33,600 spent
-║ └────────────────────────────────────────────────────────────────────┘
-║
-║ 💡 RECOMMENDATIONS:
-║ • Send personalized offers to top customers
-║ • Re-engage churned customers with discounts
-║ • Build loyalty program for repeat customers
-║
-╚════════════════════════════════════════════════════════════════════════╝
-        `.trim(),
-      };
-    }
-
-    return { error: 'Usage: !merchant customers [list]' };
+    return InteractiveMessageBuilder.listMessage(
+      '👥 TOP CUSTOMERS',
+      'Your best customers',
+      [{
+        title: 'Customers',
+        rows: topCustomers.map((customer, i) => ({
+          rowId: `customer_${i}`,
+          title: `${i + 1}. ${customer.name}`,
+          description: `${customer.orders} orders • ZWL ${customer.spent.toLocaleString()}`
+        }))
+      }],
+      'Send them special offers!'
+    );
   }
 
   /**

@@ -7,6 +7,8 @@ const backendAPI = require('../api/backendAPI');
 const authMiddleware = require('../middlewares/auth');
 const cache = require('../database/cache');
 const MessageFormatter = require('../utils/messageFormatter');
+const InteractiveMessageBuilder = require('../utils/interactiveMessageBuilder');
+const FlowManager = require('../utils/flowManager');
 const Logger = require('../config/logger');
 
 const logger = new Logger('AdminHandler');
@@ -68,7 +70,10 @@ class AdminHandler {
 
     const response = await backendAPI.getPendingMerchants();
     if (!response.success) {
-      return { error: 'Failed to fetch merchants' };
+      return InteractiveMessageBuilder.createErrorCard(
+        'Failed to fetch merchants',
+        ['Try again later', 'Check your connection']
+      );
     }
 
     const merchants = response.data;
@@ -76,24 +81,20 @@ class AdminHandler {
       return { message: `No ${status} merchants found.` };
     }
 
-    let message = `*${status.toUpperCase()} Merchants (${merchants.length})*\n━━━━━━━━━━━━━━━\n\n`;
-    
-    merchants.slice(0, 10).forEach((m, i) => {
-      message += `${i + 1}. *${m.business_name}*\n`;
-      message += `   Owner: ${m.owner_name}\n`;
-      message += `   Phone: ${m.phone}\n`;
-      message += `   Category: ${m.category}\n`;
-      message += `   ID: \`${m.id}\`\n\n`;
-    });
-
-    if (merchants.length > 10) {
-      message += `... and ${merchants.length - 10} more\n`;
-    }
-
-    message += `\nTo approve: *!admin approve <merchant_id>*\n`;
-    message += `To reject: *!admin reject <merchant_id>*`;
-
-    return { message };
+    return InteractiveMessageBuilder.listMessage(
+      `👥 ${status.toUpperCase()} MERCHANTS`,
+      `Found ${merchants.length} merchant${merchants.length !== 1 ? 's' : ''}`,
+      [{
+        title: 'Merchants',
+        rows: merchants.slice(0, 10).map((m, i) => ({
+          rowId: `approve_${m.id}`,
+          title: `${i + 1}. ${m.business_name}`,
+          description: `${m.owner_name} • ${m.category}`,
+          image: null
+        }))
+      }],
+      merchants.length > 10 ? `Showing 10 of ${merchants.length}` : 'Select to approve'
+    );
   }
 
   /**
@@ -101,24 +102,30 @@ class AdminHandler {
    */
   async handleApproveCommand(args, from, phoneNumber) {
     if (!args[0]) {
-      return { error: 'Usage: !admin approve <merchant_id>' };
+      return InteractiveMessageBuilder.createErrorCard(
+        'Merchant ID required',
+        ['Usage: !admin approve <merchant_id>', 'Get ID from !admin merchants']
+      );
     }
 
     const merchantId = args[0];
     const response = await backendAPI.approveMerchant(merchantId, phoneNumber);
 
     if (!response.success) {
-      return { error: `Failed to approve merchant: ${response.error}` };
+      return InteractiveMessageBuilder.createErrorCard(`Failed to approve: ${response.error}`);
     }
 
-    // Notify merchant
     const merchant = response.data;
     const merchantMessage = `🎉 *Your merchant account has been approved!*\n\nYou can now:\n✅ Add products\n✅ Accept orders\n✅ Manage your store\n\nType *!help* to see merchant commands.`;
     
-    return {
-      message: MessageFormatter.formatSuccess(`Merchant ${merchant.business_name} approved!`),
-      notifyUser: { phone: merchant.phone, message: merchantMessage },
-    };
+    return InteractiveMessageBuilder.createSuccessCard(
+      'Merchant Approved',
+      `${merchant.business_name} has been approved!`,
+      [
+        { text: '📊 View Stats', id: 'admin_stats' },
+        { text: '👥 View Merchants', id: 'admin_merchants' }
+      ]
+    );
   }
 
   /**
@@ -126,7 +133,10 @@ class AdminHandler {
    */
   async handleRejectCommand(args, from, phoneNumber) {
     if (!args[0]) {
-      return { error: 'Usage: !admin reject <merchant_id> [reason]' };
+      return InteractiveMessageBuilder.createErrorCard(
+        'Merchant ID required',
+        ['Usage: !admin reject <merchant_id> [reason]']
+      );
     }
 
     const merchantId = args[0];
@@ -135,16 +145,18 @@ class AdminHandler {
     const response = await backendAPI.rejectMerchant(merchantId, reason, phoneNumber);
 
     if (!response.success) {
-      return { error: `Failed to reject merchant: ${response.error}` };
+      return InteractiveMessageBuilder.createErrorCard(`Failed to reject: ${response.error}`);
     }
 
     const merchant = response.data;
-    const merchantMessage = `❌ *Your merchant application was rejected*\n\nReason: ${reason}\n\nYou can apply again after addressing the issues.`;
-
-    return {
-      message: MessageFormatter.formatSuccess(`Merchant ${merchant.business_name} rejected.`),
-      notifyUser: { phone: merchant.phone, message: merchantMessage },
-    };
+    return InteractiveMessageBuilder.createSuccessCard(
+      'Merchant Rejected',
+      `${merchant.business_name} application rejected`,
+      [
+        { text: '👥 View Merchants', id: 'admin_merchants' },
+        { text: '📋 Menu', id: 'menu' }
+      ]
+    );
   }
 
   /**
@@ -152,7 +164,10 @@ class AdminHandler {
    */
   async handleSuspendCommand(args, from, phoneNumber) {
     if (!args[0]) {
-      return { error: 'Usage: !admin suspend <merchant_id> [reason]' };
+      return InteractiveMessageBuilder.createErrorCard(
+        'Merchant ID required',
+        ['Usage: !admin suspend <merchant_id> [reason]']
+      );
     }
 
     const merchantId = args[0];
@@ -161,71 +176,109 @@ class AdminHandler {
     const response = await backendAPI.suspendMerchant(merchantId, reason, phoneNumber);
 
     if (!response.success) {
-      return { error: `Failed to suspend merchant: ${response.error}` };
+      return InteractiveMessageBuilder.createErrorCard(`Failed to suspend: ${response.error}`);
     }
 
     const merchant = response.data;
-    const merchantMessage = `⛔ *Your merchant account has been suspended*\n\nReason: ${reason}\n\nContact support to appeal this decision.`;
-
-    return {
-      message: MessageFormatter.formatSuccess(`Merchant ${merchant.business_name} suspended.`),
-      notifyUser: { phone: merchant.phone, message: merchantMessage },
-    };
+    return InteractiveMessageBuilder.createSuccessCard(
+      'Merchant Suspended',
+      `${merchant.business_name} account suspended`,
+      [
+        { text: '⚠️ View Reason', id: 'view_reason' },
+        { text: '👥 View Merchants', id: 'admin_merchants' }
+      ]
+    );
   }
 
   /**
-   * !admin sales [today|week|month]
+   * !admin sales [today|week|month] - with interactive timeframe selector
    */
   async handleSalesCommand(args, from, phoneNumber) {
+    // If no args, show interactive selector
+    if (!args[0]) {
+      return FlowManager.dateTimePickerFlow(
+        '📊 SELECT TIME PERIOD',
+        'Choose a timeframe to view sales data'
+      ).interactive;
+    }
+
     const timeframe = args[0]?.toLowerCase() || 'today';
 
     const response = await backendAPI.getSystemAnalytics(phoneNumber);
     if (!response.success) {
-      return { error: 'Failed to fetch analytics' };
+      return InteractiveMessageBuilder.createErrorCard('Failed to fetch analytics');
     }
 
     const analytics = response.data;
-    const message = `
-*📊 System Sales - ${timeframe.toUpperCase()}*
-━━━━━━━━━━━━━━━
+    const statsItems = [
+      { emoji: '📦', label: 'Total Orders', value: analytics.total_orders || 0 },
+      { emoji: '💰', label: 'Revenue', value: `ZWL ${(analytics.total_revenue || 0).toFixed(2)}` },
+      { emoji: '🏪', label: 'Merchants', value: analytics.merchant_count || 0 },
+      { emoji: '👥', label: 'Customers', value: analytics.customer_count || 0 },
+      { emoji: '⭐', label: 'Top Merchant', value: analytics.top_merchant?.name || 'N/A' },
+    ];
 
-Total Orders: ${analytics.total_orders || 0}
-Total Revenue: ZWL ${(analytics.total_revenue || 0).toFixed(2)}
-
-Merchants: ${analytics.merchant_count || 0}
-Customers: ${analytics.customer_count || 0}
-Active Stores: ${analytics.active_stores || 0}
-
-Top Merchant: ${analytics.top_merchant?.name || 'N/A'}
-Popular Category: ${analytics.popular_category || 'N/A'}
-
-System Uptime: ${this.calculateUptime()}
-    `.trim();
-
-    return { message };
+    return InteractiveMessageBuilder.createStatusCard(
+      `📊 Sales - ${timeframe.toUpperCase()}`,
+      statsItems,
+      [
+        { text: '📈 Detailed Report', id: 'sales_report' },
+        { text: '📋 Menu', id: 'menu' }
+      ]
+    );
   }
 
   /**
    * !admin logs [errors|warnings]
    */
   async handleLogsCommand(args, from, phoneNumber) {
-    const logType = args[0]?.toLowerCase() || 'errors';
+    const logType = args[0]?.toLowerCase();
+
+    // If no log type provided, show interactive selector
+    if (!logType) {
+      const logTypeOptions = [
+        {
+          id: 'log_errors',
+          text: '❌ Errors',
+          description: 'System and API errors'
+        },
+        {
+          id: 'log_warnings',
+          text: '⚠️ Warnings',
+          description: 'Warning messages'
+        },
+        {
+          id: 'log_info',
+          text: 'ℹ️ Info Logs',
+          description: 'General information'
+        },
+        {
+          id: 'log_all',
+          text: '📋 All Logs',
+          description: 'View all system logs'
+        }
+      ];
+
+      return FlowManager.argumentSelectorFlow(
+        '📋 SYSTEM LOGS',
+        'Select log type to view:',
+        logTypeOptions
+      ).interactive;
+    }
     
-    // This would be retrieved from backend logging service
-    const message = `
-*📋 System Logs - ${logType.toUpperCase()}*
-━━━━━━━━━━━━━━━
-
-Recent ${logType}:
-• Connection timeout at 14:32
-• Invalid product data at 13:15
-• Payment processing error at 11:47
-
-Total in last 24h: 3
-Resolved: 2
-    `.trim();
-
-    return { message };
+    return InteractiveMessageBuilder.listMessage(
+      `📋 SYSTEM LOGS`,
+      `Recent ${logType.toUpperCase()}`,
+      [{
+        title: logType,
+        rows: [
+          { rowId: 'log_1', title: '❌ Connection timeout', description: 'at 14:32' },
+          { rowId: 'log_2', title: '⚠️ Invalid product data', description: 'at 13:15' },
+          { rowId: 'log_3', title: '💳 Payment error', description: 'at 11:47' }
+        ]
+      }],
+      'Total in 24h: 3 | Resolved: 2'
+    );
   }
 
   /**
@@ -233,21 +286,27 @@ Resolved: 2
    */
   async handleBroadcastCommand(args, from, phoneNumber) {
     if (!args[0]) {
-      return { error: 'Usage: !admin broadcast <message>' };
+      return InteractiveMessageBuilder.createErrorCard(
+        'Message required',
+        ['Usage: !admin broadcast <message>']
+      );
     }
 
     const message = args.join(' ');
     const response = await backendAPI.sendBroadcast(phoneNumber, message, 'all');
 
     if (!response.success) {
-      return { error: 'Failed to send broadcast' };
+      return InteractiveMessageBuilder.createErrorCard('Failed to send broadcast');
     }
 
-    return {
-      message: MessageFormatter.formatSuccess(
-        `Broadcast sent to ${response.data.recipients_count || 'all'} users`
-      ),
-    };
+    return InteractiveMessageBuilder.createSuccessCard(
+      'Broadcast Sent',
+      `Message sent to ${response.data.recipients_count || 'all'} users`,
+      [
+        { text: '📊 Stats', id: 'admin_stats' },
+        { text: '📋 Menu', id: 'menu' }
+      ]
+    );
   }
 
   /**
@@ -256,32 +315,27 @@ Resolved: 2
   async handleStatsCommand(args, from, phoneNumber) {
     const response = await backendAPI.getSystemAnalytics(phoneNumber);
     if (!response.success) {
-      return { error: 'Failed to fetch statistics' };
+      return InteractiveMessageBuilder.createErrorCard('Failed to fetch statistics');
     }
 
     const data = response.data;
-    const message = `
-*📈 System Statistics*
-━━━━━━━━━━━━━━━
+    const statsItems = [
+      { emoji: '👥', label: 'Total Users', value: data.total_users || 0 },
+      { emoji: '🛍️', label: 'Customers', value: data.customer_count || 0 },
+      { emoji: '🏪', label: 'Merchants', value: data.merchant_count || 0 },
+      { emoji: '📦', label: 'Total Orders', value: data.total_orders || 0 },
+      { emoji: '💰', label: 'Total Revenue', value: `ZWL ${(data.total_revenue || 0).toFixed(2)}` },
+      { emoji: '📊', label: 'Avg Response', value: `${data.avg_response_time || 'N/A'}ms` },
+    ];
 
-USERS:
-👥 Total Users: ${data.total_users || 0}
-🛍️ Customers: ${data.customer_count || 0}
-🏪 Merchants: ${data.merchant_count || 0}
-👨‍💼 Admins: ${data.admin_count || 0}
-
-ACTIVITY:
-📦 Total Orders: ${data.total_orders || 0}
-💰 Total Revenue: ZWL ${(data.total_revenue || 0).toFixed(2)}
-📊 Average Order: ZWL ${(data.average_order || 0).toFixed(2)}
-
-PERFORMANCE:
-⏱️ Response Time: ${data.avg_response_time || 'N/A'}ms
-✅ System Uptime: ${this.calculateUptime()}
-🔄 Sync Status: OK
-    `.trim();
-
-    return { message };
+    return InteractiveMessageBuilder.createStatusCard(
+      '📈 SYSTEM STATISTICS',
+      statsItems,
+      [
+        { text: '💾 Backup', id: 'admin_backup' },
+        { text: '📋 Menu', id: 'menu' }
+      ]
+    );
   }
 
   /**
@@ -289,23 +343,24 @@ PERFORMANCE:
    */
   async handleAlertsCommand(args, from, phoneNumber) {
     const response = await backendAPI.getSystemAlerts(phoneNumber);
-    if (!response.success) {
-      return { message: 'No active alerts' };
-    }
-
-    const alerts = response.data;
-    if (alerts.length === 0) {
+    if (!response.success || response.data.length === 0) {
       return { message: '✅ No active alerts' };
     }
 
-    let message = '*🚨 System Alerts*\n━━━━━━━━━━━━━━━\n\n';
-    alerts.forEach((alert, i) => {
-      message += `${i + 1}. ${alert.title}\n`;
-      message += `   ${alert.description}\n`;
-      message += `   Time: ${new Date(alert.created_at).toLocaleString()}\n\n`;
-    });
-
-    return { message };
+    const alerts = response.data;
+    return InteractiveMessageBuilder.listMessage(
+      '🚨 SYSTEM ALERTS',
+      `${alerts.length} active alert${alerts.length !== 1 ? 's' : ''}`,
+      [{
+        title: 'Alerts',
+        rows: alerts.map((alert, idx) => ({
+          rowId: `alert_${idx}`,
+          title: alert.title,
+          description: alert.description
+        }))
+      }],
+      'Review and take action'
+    );
   }
 
   /**
