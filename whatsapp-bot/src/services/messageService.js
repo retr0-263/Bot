@@ -339,6 +339,67 @@ END:VCARD`;
       return { success: false, error: error.message };
     }
   }
+
+  /**
+   * Send Rich Text Message with External Ad Reply
+   * Mimics the CypherX bot style with title, body, and external link preview
+   * @param {string} chatId - Chat ID
+   * @param {string} text - Message text
+   * @param {object} options - Options object
+   *   - title: External link title
+   *   - description: External link description
+   *   - thumbnail: Thumbnail image URL or Buffer
+   *   - sourceUrl: URL to open when clicked
+   *   - mediaType: 1 (image), 2 (video), etc.
+   *   - mentions: Array of phone numbers to mention
+   */
+  async sendRichMessage(chatId, text, options = {}) {
+    try {
+      const message = {
+        text: text,
+        contextInfo: {}
+      };
+
+      // Add mentions if provided
+      if (options.mentions && options.mentions.length > 0) {
+        message.contextInfo.mentionedJid = options.mentions;
+      }
+
+      // Add external ad reply (link preview)
+      if (options.title || options.sourceUrl) {
+        message.contextInfo.externalAdReply = {
+          title: options.title || 'Smart Bot',
+          body: options.description || '',
+          thumbnail: options.thumbnail || null,
+          sourceUrl: options.sourceUrl || 'https://github.com',
+          mediaType: options.mediaType || 1,
+          renderLargerThumbnail: true
+        };
+      }
+
+      await this.sock.sendMessage(chatId, message);
+      return { success: true };
+    } catch (error) {
+      console.error(chalk.red('❌ Error sending rich message:'), error.message);
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Send Interactive List/Button Message
+   * For WhatsApp's native interactive menus
+   * @param {string} chatId - Chat ID
+   * @param {object} messagePayload - Full interactive message payload
+   */
+  async sendInteractiveMessage(chatId, messagePayload) {
+    try {
+      await this.sock.sendMessage(chatId, messagePayload);
+      return { success: true };
+    } catch (error) {
+      console.error(chalk.red('❌ Error sending interactive message:'), error.message);
+      return { success: false, error: error.message };
+    }
+  }
 }
 
 module.exports = MessageService;

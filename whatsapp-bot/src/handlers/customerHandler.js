@@ -131,11 +131,26 @@ class CustomerHandler {
     const response = await backendAPI.getProducts({});
     const products = response?.success ? response.data.slice(0, 6) : dummyProducts;
 
-    // Return beautiful world-class menu
-    const menuDisplay = WorldClassResponses.createProductMenu(products, 'All Products');
-    
-    // Send the message
-    await this.messageService.sendTextMessage(from, menuDisplay);
+    // Create interactive list message with product menu
+    const sections = [{
+      title: 'Popular Products',
+      rows: products.slice(0, 6).map(product => ({
+        rowId: `menu_${product.id}`,
+        title: `${product.image} ${product.name}`,
+        description: `ZWL ${product.price.toFixed(0)} | ⭐ ${product.rating}`
+      }))
+    }];
+
+    const menuMessage = {
+      text: '🛍️ *ALL PRODUCTS*\n\nSelect a product to view details and add to cart:',
+      footer: '━━━━━━━━━━━ Smart Bot ━━━━━━━━━━━',
+      sections: sections,
+      buttonText: 'View Products',
+      title: 'Menu'
+    };
+
+    // Send the interactive list message
+    await this.messageService.sendInteractiveMessage(from, { listMessage: menuMessage });
     return { success: true };
   }
 
@@ -144,42 +159,68 @@ class CustomerHandler {
    */
   async handleSearchCommand(query, phoneNumber, from) {
     if (!query || query.length < 2) {
-      const errorMsg = WorldClassResponses.createHelpfulError('NO_PRODUCTS', [
-        'Use at least 2 characters',
-        'Example: !search pizza'
-      ]);
-      await this.messageService.sendTextMessage(from, errorMsg);
+      const errorMsg = `🔍 *SEARCH PRODUCTS*
+
+Please provide a search term with at least 2 characters.
+
+Examples:
+• !search pizza
+• !search chicken
+• !search bread
+• !search coke
+
+🔹 What to search:
+   - Product names
+   - Categories
+   - Cuisines
+   - Brands`;
+      
+      await this.messageService.sendRichMessage(from, errorMsg, {
+        title: '🔎 Search Guide',
+        description: 'Learn how to search for products',
+        sourceUrl: 'https://smart-bot.io/search'
+      });
       return { success: true };
     }
 
     const response = await backendAPI.searchProducts(query);
     if (!response.success || response.data.length === 0) {
-      const errorMsg = WorldClassResponses.createHelpfulError('NO_PRODUCTS', [
-        'Try different keywords',
-        'Browse !menu to see all items',
-        'Type !categories to explore by type'
-      ]);
-      await this.messageService.sendTextMessage(from, errorMsg);
+      const errorMsg = `🔍 *NO RESULTS FOUND*
+
+"${query}" didn't match any products.
+
+Try:
+• Different keywords
+• Browse !menu to see all items
+• Type !categories to explore by type`;
+      
+      await this.messageService.sendRichMessage(from, errorMsg, {
+        title: '❌ Search Not Found',
+        description: 'Try browsing or searching with different keywords',
+        sourceUrl: 'https://smart-bot.io/menu'
+      });
       return { success: true };
     }
 
-    const searchDisplay = `
-╔════════════════════════════════════════╗
-║  🔎 *SEARCH RESULTS*
-║  "${query}" - Found ${response.data.length}
-╠════════════════════════════════════════╣
-║
-${response.data.slice(0, 10).map((p, i) => `║ ${(i + 1).toString().padEnd(2, '.')} ${p.image || '🛍️'} ${(p.name || '').substring(0, 24)}
-║    💰 ZWL ${p.price.toFixed(0).padEnd(8)} ⭐ ${(p.rating || 0).toFixed(1)}
-║`).join('\n')}
-╠════════════════════════════════════════╣
-║ ${response.data.length > 10 ? `Showing 10 of ${response.data.length}` : 'All results shown'}
-║ 👉 Reply with number to add
-║ Example: Reply "1" for first item
-╚════════════════════════════════════════╝
-    `.trim();
+    // Create interactive list with search results
+    const sections = [{
+      title: `Search Results (${response.data.length} found)`,
+      rows: response.data.slice(0, 10).map(product => ({
+        rowId: `search_${product.id}`,
+        title: `${product.image || '🛍️'} ${(product.name || '').substring(0, 25)}`,
+        description: `ZWL ${product.price.toFixed(0)} | ⭐ ${(product.rating || 0).toFixed(1)}`
+      }))
+    }];
 
-    await this.messageService.sendTextMessage(from, searchDisplay);
+    const searchMessage = {
+      text: `🔍 *SEARCH RESULTS*\n\n"${query}"\n\nFound ${response.data.length} product(s):`,
+      footer: '━━━━━━━━ Select to add to cart ━━━━━━━━',
+      sections: sections,
+      buttonText: 'Select Product',
+      title: 'Search Results'
+    };
+
+    await this.messageService.sendInteractiveMessage(from, { listMessage: searchMessage });
     return { success: true };
   }
 
@@ -188,30 +229,33 @@ ${response.data.slice(0, 10).map((p, i) => `║ ${(i + 1).toString().padEnd(2, '
    */
   async handleCategoriesCommand(phoneNumber, from) {
     const categories = [
-      { emoji: '🍔', title: 'Food & Restaurants', id: 'cat_food' },
-      { emoji: '🛍️', title: 'Retail & Shopping', id: 'cat_retail' },
-      { emoji: '📚', title: 'Books & Media', id: 'cat_books' },
-      { emoji: '👕', title: 'Fashion & Apparel', id: 'cat_fashion' },
-      { emoji: '🏥', title: 'Health & Wellness', id: 'cat_health' },
-      { emoji: '⚙️', title: 'Electronics', id: 'cat_electronics' },
-      { emoji: '🌿', title: 'Groceries', id: 'cat_groceries' },
+      { emoji: '🍔', title: 'Food & Restaurants', id: 'cat_food', description: 'Pizza, Chicken, Burgers' },
+      { emoji: '🛍️', title: 'Retail & Shopping', id: 'cat_retail', description: 'Clothes, Accessories' },
+      { emoji: '📚', title: 'Books & Media', id: 'cat_books', description: 'Books, Music, Video' },
+      { emoji: '👕', title: 'Fashion & Apparel', id: 'cat_fashion', description: 'Clothing, Shoes' },
+      { emoji: '🏥', title: 'Health & Wellness', id: 'cat_health', description: 'Pharmacy, Supplements' },
+      { emoji: '⚙️', title: 'Electronics', id: 'cat_electronics', description: 'Phones, Gadgets' },
+      { emoji: '🌿', title: 'Groceries', id: 'cat_groceries', description: 'Fresh Produce' },
     ];
 
-    const categoryDisplay = `
-╔════════════════════════════════════════╗
-║  📂 *SHOP BY CATEGORY*
-╠════════════════════════════════════════╣
-║
-${categories.map((cat, i) => `║ ${(i + 1).toString().padEnd(2, '.')} ${cat.emoji} *${cat.title}*`).join('\n║\n')}
-║
-╠════════════════════════════════════════╣
-║ 👉 Reply with number
-║ Example: Reply "1" for Food
-║ Or: !search <keyword>
-╚════════════════════════════════════════╝
-    `.trim();
+    const sections = [{
+      title: 'Shop by Category',
+      rows: categories.map(cat => ({
+        rowId: `cat_${cat.id}`,
+        title: `${cat.emoji} ${cat.title}`,
+        description: cat.description
+      }))
+    }];
 
-    await this.messageService.sendTextMessage(from, categoryDisplay);
+    const categoryMessage = {
+      text: '📂 *SHOP BY CATEGORY*\n\nBrowse our product categories:',
+      footer: '━━━━━━━━ Select category ━━━━━━━━',
+      sections: sections,
+      buttonText: 'Browse Category',
+      title: 'Categories'
+    };
+
+    await this.messageService.sendInteractiveMessage(from, { listMessage: categoryMessage });
     return { success: true };
   }
 
@@ -225,22 +269,24 @@ ${categories.map((cat, i) => `║ ${(i + 1).toString().padEnd(2, '.')} ${cat.emo
       { emoji: '🥖', name: 'Local Bakery', distance: '1.2km', rating: 4.9, id: 'store_3' },
     ];
 
-    const nearbyDisplay = `
-╔════════════════════════════════════════╗
-║  📍 *STORES NEAR YOU*
-║     Harare & Bulawayo Area
-╠════════════════════════════════════════╣
-║
-${stores.map((store, i) => `║ ${(i + 1).toString().padEnd(2, '.')} ${store.emoji} ${store.name}
-║    📍 ${store.distance.padEnd(10)} ⭐ ${store.rating}/5.0`).join('\n║\n')}
-║
-╠════════════════════════════════════════╣
-║ 👉 Reply with number to view store
-║ Example: Reply "1" for Supa Stores
-╚════════════════════════════════════════╝
-    `.trim();
+    const sections = [{
+      title: 'Nearby Stores',
+      rows: stores.map(store => ({
+        rowId: `store_${store.id}`,
+        title: `${store.emoji} ${store.name}`,
+        description: `${store.distance} away | ⭐ ${store.rating}/5.0`
+      }))
+    }];
 
-    await this.messageService.sendTextMessage(from, nearbyDisplay);
+    const nearbyMessage = {
+      text: '📍 *STORES NEAR YOU*\n\nHarare & Bulawayo Area\n\nSelect a store to view their menu:',
+      footer: '━━━━━━━━ Select store ━━━━━━━━',
+      sections: sections,
+      buttonText: 'View Store',
+      title: 'Nearby Stores'
+    };
+
+    await this.messageService.sendInteractiveMessage(from, { listMessage: nearbyMessage });
     return { success: true };
   }
 
@@ -323,25 +369,40 @@ ${stores.map((store, i) => `║ ${(i + 1).toString().padEnd(2, '.')} ${store.emo
     const cart = await cache.getUserCart(phoneNumber);
     
     if (!cart.items || cart.items.length === 0) {
-      return InteractiveMessageBuilder.createErrorCard(
-        'Your cart is empty',
-        ['Browse items: !menu', 'Search: !search <item>']
-      );
+      const emptyMsg = `🛒 *YOUR CART IS EMPTY*
+
+No items in your cart yet.
+
+Browse and add items:
+• !menu - View all products
+• !search <item> - Search for items
+• !categories - Shop by category
+• !nearby - Find nearby stores`;
+      
+      await this.messageService.sendRichMessage(from, emptyMsg, {
+        title: '🛒 Empty Cart',
+        description: 'Browse products and add items to your cart',
+        sourceUrl: 'https://smart-bot.io/menu'
+      });
+      return { success: true };
     }
 
-    const itemSummary = cart.items.map((item, idx) => `${idx + 1}. ${item.name} x${item.quantity} = ZWL ${(item.price * item.quantity).toFixed(2)}`).join('\n');
+    const itemSummary = cart.items.map((item, idx) => 
+      `${idx + 1}. ${item.name} x${item.quantity} = ZWL ${(item.price * item.quantity).toFixed(2)}`
+    ).join('\n');
 
-    let body = `*🛒 YOUR CART*\n━━━━━━━━━━━━━\n\n${itemSummary}\n\n`;
-    body += `💰 *Total: ZWL ${cart.total.toFixed(2)}*`;
+    let body = `🛒 *YOUR CART*\n━━━━━━━━━━━━━━━\n\n${itemSummary}\n\n`;
+    body += `💰 *TOTAL: ZWL ${cart.total.toFixed(2)}*\n\n`;
+    body += `Items: ${cart.items.length}\n`;
+    body += `Status: Ready to checkout`;
 
-    return InteractiveMessageBuilder.templateButtonMessage(
-      body,
-      [
-        { text: '✅ Checkout', id: 'checkout' },
-        { text: '🗑️ Clear Cart', id: 'clear_cart' },
-        { text: '➕ Add More', id: 'menu' }
-      ]
-    );
+    await this.messageService.sendRichMessage(from, body, {
+      title: '🛒 Shopping Cart',
+      description: `${cart.items.length} item(s) | ZWL ${cart.total.toFixed(2)}`,
+      sourceUrl: 'https://smart-bot.io/checkout'
+    });
+    
+    return { success: true };
   }
 
   /**
@@ -407,10 +468,19 @@ ${stores.map((store, i) => `║ ${(i + 1).toString().padEnd(2, '.')} ${store.emo
       const cart = await cache.getUserCart(phoneNumber);
 
       if (!cart.items || cart.items.length === 0) {
-        return InteractiveMessageBuilder.createErrorCard(
-          'Cart is Empty',
-          ['Start shopping: !menu', 'Search items: !search <item>']
-        );
+        const emptyMsg = `🛒 *CART IS EMPTY*
+
+Add items to your cart first:
+• !menu - Browse products
+• !search <item> - Search
+• !categories - Shop by category`;
+        
+        await this.messageService.sendRichMessage(from, emptyMsg, {
+          title: '🛒 Empty Cart',
+          description: 'Your cart is empty',
+          sourceUrl: 'https://smart-bot.io/menu'
+        });
+        return { success: true };
       }
 
       const session = await cache.getUserSession(phoneNumber);
@@ -428,10 +498,18 @@ ${stores.map((store, i) => `║ ${(i + 1).toString().padEnd(2, '.')} ${store.emo
       const dbResult = await databaseService.createOrder(orderData);
 
       if (!dbResult.success) {
-        return InteractiveMessageBuilder.createErrorCard(
-          'Checkout Failed',
-          [dbResult.error]
-        );
+        const errorMsg = `❌ *CHECKOUT FAILED*
+
+Error: ${dbResult.error}
+
+Try again or contact support.`;
+        
+        await this.messageService.sendRichMessage(from, errorMsg, {
+          title: '❌ Checkout Error',
+          description: 'There was an error processing your checkout',
+          sourceUrl: 'https://smart-bot.io/support'
+        });
+        return { success: true };
       }
 
       const order = dbResult.data;
@@ -443,20 +521,37 @@ ${stores.map((store, i) => `║ ${(i + 1).toString().padEnd(2, '.')} ${store.emo
 
       logger.info(`Order created: ${order.order_number}`);
 
-      return InteractiveMessageBuilder.createSuccessCard(
-        '✅ Order Placed!',
-        `Order #${order.order_number}\nTotal: ZWL ${order.total.toFixed(2)}\nStatus: Pending confirmation`,
-        [
-          { text: '📦 Track Order', id: 'track_order' },
-          { text: '🏪 Continue Shopping', id: 'menu' }
-        ]
-      );
+      const successMsg = `✅ *ORDER PLACED!*
+
+*Order Details:*
+• Order #: ${order.order_number}
+• Total: ZWL ${order.total.toFixed(2)}
+• Items: ${cart.items.length}
+• Status: Pending Confirmation
+
+Your order will be prepared and delivered soon. Track it with !track ${order.order_number}`;
+
+      await this.messageService.sendRichMessage(from, successMsg, {
+        title: '✅ Order Confirmed',
+        description: `Order #${order.order_number} - ZWL ${order.total.toFixed(2)}`,
+        sourceUrl: 'https://smart-bot.io/orders'
+      });
+
+      return { success: true };
     } catch (error) {
       logger.error('Checkout error', error);
-      return InteractiveMessageBuilder.createErrorCard(
-        'Checkout Error',
-        [error.message]
-      );
+      const errorMsg = `❌ *CHECKOUT ERROR*
+
+${error.message}
+
+Please try again or contact support.`;
+      
+      await this.messageService.sendRichMessage(from, errorMsg, {
+        title: '❌ Error',
+        description: 'An error occurred during checkout',
+        sourceUrl: 'https://smart-bot.io/support'
+      });
+      return { success: true };
     }
   }
 
@@ -466,24 +561,45 @@ ${stores.map((store, i) => `║ ${(i + 1).toString().padEnd(2, '.')} ${store.emo
   async handleOrdersCommand(phoneNumber, from) {
     const response = await backendAPI.getCustomerOrders(phoneNumber);
     if (!response.success || response.data.length === 0) {
-      return { message: 'You have no orders yet. Type !menu to browse and !add to order.' };
+      const emptyMsg = `📦 *NO ORDERS YET*
+
+You haven't placed any orders yet.
+
+Start shopping:
+• !menu - Browse all products
+• !search <item> - Find specific items
+• !categories - Shop by category`;
+      
+      await this.messageService.sendRichMessage(from, emptyMsg, {
+        title: '📦 Orders',
+        description: 'You have no orders yet. Start shopping!',
+        sourceUrl: 'https://smart-bot.io/menu'
+      });
+      return { success: true };
     }
 
     const orders = response.data.slice(0, 10);
-    let message = `*📦 Your Orders (${orders.length})*\n━━━━━━━━━━━━━━━\n\n`;
+    
+    // Create interactive list of orders
+    const sections = [{
+      title: 'Your Orders',
+      rows: orders.map(order => ({
+        rowId: `order_${order.id}`,
+        title: `Order #${order.id}`,
+        description: `${order.merchant_name} | ZWL ${order.total.toFixed(2)} | ${MessageFormatter.getStatusEmoji(order.status)} ${order.status}`
+      }))
+    }];
 
-    orders.forEach((order, i) => {
-      message += `${i + 1}. Order #${order.id}\n`;
-      message += `   🏪 ${order.merchant_name}\n`;
-      message += `   💰 ZWL ${order.total.toFixed(2)}\n`;
-      message += `   Status: ${MessageFormatter.getStatusEmoji(order.status)} ${order.status}\n`;
-      message += `   Date: ${new Date(order.created_at).toLocaleDateString()}\n\n`;
-    });
+    const ordersMessage = {
+      text: `📦 *YOUR ORDERS*\n\nYou have ${orders.length} order(s):`,
+      footer: '━━━━━━ Select to track ━━━━━━',
+      sections: sections,
+      buttonText: 'View Order',
+      title: 'Order History'
+    };
 
-    message += `To track: *!track <order_id>*\n`;
-    message += `To reorder: *!reorder <order_id>*`;
-
-    return { message };
+    await this.messageService.sendInteractiveMessage(from, { listMessage: ordersMessage });
+    return { success: true };
   }
 
   /**
