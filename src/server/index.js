@@ -9,9 +9,18 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const bodyParser = require('body-parser');
+const http = require('http');
+const chalk = require('chalk');
 
 const app = express();
 const PORT = process.env.API_PORT || 5174;
+
+// Create HTTP server for WebSocket support
+const server = http.createServer(app);
+
+// Import and initialize WebSocket server
+const WebSocketServer = require('./websocket');
+const wsServer = new WebSocketServer(server);
 
 // Middleware
 app.use(cors({
@@ -655,7 +664,123 @@ app.get('/health', (req, res) => {
     status: 'ok',
     message: 'Dashboard API server running',
     timestamp: new Date().toISOString(),
-    uptime: process.uptime()
+    uptime: process.uptime(),
+    websocket: {
+      connected: true,
+      stats: wsServer.getStats()
+    }
+  });
+});
+
+// ============================================
+// WEBSOCKET EVENT ENDPOINT (Bot → Dashboard)
+// ============================================
+
+app.post('/api/ws-event', (req, res) => {
+  try {
+    const event = req.body;
+    
+    if (!event || !event.type) {
+      return res.status(400).json({ success: false, error: 'Missing event type' });
+    }
+
+    console.log(chalk.cyan(`[WS-EVENT] Received: ${event.type}`));
+
+    // Route event to appropriate room(s)
+    switch (event.type) {
+      case 'bot_status':
+        wsServer.broadcastAll({
+          type: 'bot_status',
+          ...event
+        });
+        break;
+
+      case 'new_order':
+        if (event.order && event.order.merchant_id) {
+          wsServer.broadcastToRoom(`merchant_${event.order.merchant_id}`, {
+            type: 'new_order',
+            ...event
+          });
+          wsServer.broadcastToRoom('admin_dashboard', {
+            type: 'new_order',
+            ...event
+          });
+        }
+        break;
+
+      case 'order_status_changed':
+        if (event.orderId) {
+          wsServer.broadcastToRoom(`order_${event.orderId}`, {
+            type: 'order_status_changed',
+            ...event
+          });
+        }
+        if (event.details && event.details.merchant_id) {
+          wsServer.broadcastToRoom(`merchant_${event.details.merchant_id}`, {
+            type: 'order_status_changed',
+            ...event
+          });
+        }
+        break;
+
+      case 'bot_message':
+        wsServer.broadcastAll({
+          type: 'bot_message',
+          ...event
+        });
+        break;
+
+      case 'command_executed':
+        wsServer.broadcastToRoom('admin_dashboard', {
+          type: 'command_executed',
+          ...event
+        });
+        break;
+
+      case 'merchant_notification':
+        if (event.merchantId) {
+          wsServer.broadcastToRoom(`merchant_${event.merchantId}`, {
+            type: 'merchant_notification',
+            ...event
+          });
+        }
+        break;
+
+      case 'user_activity':
+        wsServer.broadcastToRoom('admin_dashboard', {
+          type: 'user_activity',
+          ...event
+        });
+        break;
+
+      case 'inventory_updated':
+        wsServer.broadcastToRoom('admin_dashboard', {
+          type: 'inventory_updated',
+          ...event
+        });
+        break;
+
+      default:
+        wsServer.broadcastAll({
+          type: event.type,
+          ...event
+        });
+    }
+
+    res.json({ success: true, message: 'Event broadcasted' });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ============================================
+// WEBSOCKET STATS ENDPOINT
+// ============================================
+
+app.get('/api/ws-stats', (req, res) => {
+  res.json({
+    success: true,
+    data: wsServer.getStats()
   });
 });
 
@@ -663,8 +788,9 @@ app.get('/health', (req, res) => {
 // START SERVER
 // ============================================
 
-app.listen(PORT, () => {
-  console.log(`\n✅ Dashboard API Server running on http://localhost:${PORT}`);
-  console.log(`📊 Connected to dashboard on http://localhost:5173`);
-  console.log(`💾 Data stored in: ${DATA_DIR}\n`);
+server.listen(PORT, () => {
+  console.log(chalk.green(`\n✅ Dashboard API Server running on http://localhost:${PORT}`));
+  console.log(chalk.cyan(`📊 Connected to dashboard on http://localhost:5173`));
+  console.log(chalk.blue(`🔌 WebSocket server ready at ws://localhost:${PORT}/ws`));
+  console.log(chalk.yellow(`💾 Data stored in: ${DATA_DIR}\n`));
 });

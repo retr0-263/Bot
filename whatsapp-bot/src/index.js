@@ -33,6 +33,7 @@ const MessageService = require('./services/messageService');
 const UtilityCommandHandler = require('./services/utilityCommandHandler');
 const AdvancedAdminHandler = require('./services/advancedAdminHandler');
 const InteractiveMessageHandler = require('./services/interactiveMessageHandler');
+const WebSocketEventEmitter = require('./services/websocketEventEmitter');
 
 // Import utilities
 const PrefixManager = require('./utils/prefixManager');
@@ -193,6 +194,11 @@ class SmartWhatsAppBot {
 
       if (connection === 'open') {
         console.log(chalk.green('✅ Bot connected successfully!'));
+        // Emit bot connected event
+        WebSocketEventEmitter.botConnected(this.sock.user.id, {
+          version: this.sock.version,
+          platform: this.sock.user.platform,
+        });
       }
 
       if (connection === 'close') {
@@ -202,6 +208,9 @@ class SmartWhatsAppBot {
           chalk.yellow(`🔌 Connection closed: ${lastDisconnect?.error?.message || 'Unknown reason'}`),
           shouldReconnect ? chalk.yellow('Reconnecting...') : chalk.red('Not reconnecting')
         );
+
+        // Emit bot disconnected event
+        WebSocketEventEmitter.botDisconnected(lastDisconnect?.error?.message || 'unknown');
 
         if (shouldReconnect) {
           setTimeout(() => this.startBot(), 3000);
@@ -294,6 +303,9 @@ class SmartWhatsAppBot {
       // Get message text
       const text = this.getMessageText(message);
 
+      // Emit message received event to dashboard
+      WebSocketEventEmitter.messageReceived(from, text, message.message.imageMessage || message.message.videoMessage || message.message.documentMessage ? true : false);
+
       // Handle interactive responses
       const buttonReply = await this.interactiveMessageHandler.handleButtonResponse(message, from, cleanPhone);
       if (buttonReply) {
@@ -347,6 +359,9 @@ class SmartWhatsAppBot {
       const { prefix, command, args } = parsed;
 
       console.log(chalk.blue(`📝 Command: ${command}`), chalk.gray(`from ${cleanPhone}`), chalk.yellow(`[${prefix}]`));
+
+      // Emit command executed event
+      WebSocketEventEmitter.commandExecuted(from, command, args, 'processing');
 
       // Smart reaction based on command type
       const reactionMap = {
